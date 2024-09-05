@@ -10,7 +10,7 @@ class Item extends Model
     protected $fillable = [
         'user_id',
         'game_id',
-        'title',
+        'name',
         'slug',
         'description',
         'content',

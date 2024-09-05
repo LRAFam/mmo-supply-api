@@ -4,6 +4,7 @@ use App\Http\Controllers\AccountController;
 use App\Http\Controllers\AdvertisementController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\GameController;
+use App\Http\Controllers\ItemController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -26,6 +27,10 @@ Route::middleware(['auth:sanctum'])->prefix('stripe')->name('stripe.')->group(fu
 
 Route::group(['prefix' => 'games'], function () {
     Route::get('/', [GameController::class, 'index'])->name('.index');
+});
+
+Route::group(['prefix' => 'items'], function () {
+    Route::get('/', [ItemController::class, 'index'])->name('.index');
 });
 
 Route::group(['prefix' => 'accounts'], function () {
