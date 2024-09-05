@@ -126,6 +126,35 @@
       <path value="$PROJECT_DIR$/api/vendor/myclabs/deep-copy" />
       <path value="$PROJECT_DIR$/api/vendor/monolog/monolog" />
       <path value="$PROJECT_DIR$/api/vendor/laravel/sanctum" />
+      <path value="$PROJECT_DIR$/api/vendor/stripe/stripe-php" />
+      <path value="$PROJECT_DIR$/api/vendor/ryangjchandler/blade-capture-directive" />
+      <path value="$PROJECT_DIR$/api/vendor/filament/actions" />
+      <path value="$PROJECT_DIR$/api/vendor/filament/notifications" />
+      <path value="$PROJECT_DIR$/api/vendor/filament/filament" />
+      <path value="$PROJECT_DIR$/api/vendor/filament/support" />
+      <path value="$PROJECT_DIR$/api/vendor/filament/widgets" />
+      <path value="$PROJECT_DIR$/api/vendor/filament/forms" />
+      <path value="$PROJECT_DIR$/api/vendor/filament/infolists" />
+      <path value="$PROJECT_DIR$/api/vendor/filament/tables" />
+      <path value="$PROJECT_DIR$/api/vendor/symfony/html-sanitizer" />
+      <path value="$PROJECT_DIR$/api/vendor/blade-ui-kit/blade-icons" />
+      <path value="$PROJECT_DIR$/api/vendor/blade-ui-kit/blade-heroicons" />
+      <path value="$PROJECT_DIR$/api/vendor/openspout/openspout" />
+      <path value="$PROJECT_DIR$/api/vendor/spatie/invade" />
+      <path value="$PROJECT_DIR$/api/vendor/spatie/laravel-package-tools" />
+      <path value="$PROJECT_DIR$/api/vendor/spatie/color" />
+      <path value="$PROJECT_DIR$/api/vendor/masterminds/html5" />
+      <path value="$PROJECT_DIR$/api/vendor/psr/cache" />
+      <path value="$PROJECT_DIR$/api/vendor/anourvalar/eloquent-serialize" />
+      <path value="$PROJECT_DIR$/api/vendor/doctrine/dbal" />
+      <path value="$PROJECT_DIR$/api/vendor/doctrine/deprecations" />
+      <path value="$PROJECT_DIR$/api/vendor/league/uri-interfaces" />
+      <path value="$PROJECT_DIR$/api/vendor/danharrin/date-format-converter" />
+      <path value="$PROJECT_DIR$/api/vendor/danharrin/livewire-rate-limiting" />
+      <path value="$PROJECT_DIR$/api/vendor/league/csv" />
+      <path value="$PROJECT_DIR$/api/vendor/league/uri" />
+      <path value="$PROJECT_DIR$/api/vendor/kirschbaum-development/eloquent-power-joins" />
+      <path value="$PROJECT_DIR$/api/vendor/livewire/livewire" />
     </include_path>
   </component>
   <component name="PhpProjectSharedConfiguration" php_language_level="8.2" />
