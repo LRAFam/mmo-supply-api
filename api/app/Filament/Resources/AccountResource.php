@@ -6,6 +6,7 @@ use App\Filament\Resources\AccountResource\Pages;
 use App\Filament\Resources\AccountResource\RelationManagers;
 use App\Models\Account;
 use Filament\Forms;
+use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
@@ -39,7 +40,13 @@ class AccountResource extends Resource
                     ->maxLength(255),
                 Forms\Components\Textarea::make('content')
                     ->columnSpanFull(),
-                Forms\Components\TextInput::make('images'),
+                FileUpload::make('images')
+                    ->label('Account images')
+                    ->image()
+                    ->multiple()
+                    ->maxSize(2048)
+                    ->required()
+                    ->columnSpan(2),
                 Forms\Components\TextInput::make('price')
                     ->required()
                     ->numeric()

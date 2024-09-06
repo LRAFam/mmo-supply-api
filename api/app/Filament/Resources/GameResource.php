@@ -6,6 +6,7 @@ use App\Filament\Resources\GameResource\Pages;
 use App\Filament\Resources\GameResource\RelationManagers;
 use App\Models\Game;
 use Filament\Forms;
+use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
@@ -29,10 +30,19 @@ class GameResource extends Resource
                 Forms\Components\TextInput::make('slug')
                     ->required()
                     ->maxLength(255),
-                Forms\Components\TextInput::make('logo')
-                    ->maxLength(255),
-                Forms\Components\TextInput::make('icon')
-                    ->maxLength(255),
+                FileUpload::make('logo')
+                    ->label('Game Logo')
+                    ->image()
+                    ->maxSize(2048)
+                    ->required()
+                    ->columnSpan(2),
+
+                FileUpload::make('icon')
+                    ->label('Game Icon')
+                    ->image()
+                    ->maxSize(1024)
+                    ->required()
+                    ->columnSpan(2),
                 Forms\Components\TextInput::make('description')
                     ->maxLength(255),
                 Forms\Components\TextInput::make('provider_count')

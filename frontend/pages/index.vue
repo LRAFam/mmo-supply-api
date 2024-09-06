@@ -3,6 +3,11 @@
     <div v-if="gameLoading" class="">Loading..</div>
     <div v-if="gameError" class="">{{ gameError }}</div>
     {{ gameData }}
+    <div v-for="game in gameData" class="">
+      <h2>{{ game.title }}</h2>
+      <img :src="game.logo" :alt="game.title" />
+      <p>{{ game.provider_count }}</p>
+    </div>
   </div>
 </template>
 

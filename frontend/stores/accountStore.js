@@ -4,7 +4,7 @@ import axios from 'axios'
 
 export const useAccountStore = defineStore('accounts', () => {
     // State
-    const data = ref(null)
+    const accounts = ref(null)
     const loading = ref(false)
     const error = ref(null)
 
@@ -14,7 +14,7 @@ export const useAccountStore = defineStore('accounts', () => {
         error.value = null
         try {
             const response = await axios.get('http://localhost:8000/api/accounts')
-            data.value = response.data
+            accounts.value = response.data
         } catch (err) {
             error.value = err.message
         } finally {
@@ -24,6 +24,6 @@ export const useAccountStore = defineStore('accounts', () => {
 
     // Expose state and actions
     return {
-        data, loading, error, fetchAccounts
+        accounts, loading, error, fetchAccounts
     }
 })

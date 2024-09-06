@@ -2,9 +2,13 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
+use App\Models\Account;
+use Illuminate\Database\Eloquent\Collection;
 
 class AccountController extends Controller
 {
-    //
+    public function index(): Collection
+    {
+        return Account::all();
+    }
 }

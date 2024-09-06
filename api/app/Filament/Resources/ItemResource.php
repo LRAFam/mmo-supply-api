@@ -6,6 +6,7 @@ use App\Filament\Resources\ItemResource\Pages;
 use App\Filament\Resources\ItemResource\RelationManagers;
 use App\Models\Item;
 use Filament\Forms;
+use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
@@ -39,7 +40,12 @@ class ItemResource extends Resource
                     ->maxLength(255),
                 Forms\Components\Textarea::make('content')
                     ->columnSpanFull(),
-                Forms\Components\TextInput::make('images'),
+                FileUpload::make('images')
+                    ->label('Item images')
+                    ->image()
+                    ->maxSize(2048)
+                    ->required()
+                    ->columnSpan(2),
                 Forms\Components\TextInput::make('price')
                     ->required()
                     ->numeric()

@@ -4,7 +4,7 @@ import axios from 'axios'
 
 export const useItemStore = defineStore('items', () => {
     // State
-    const data = ref(null)
+    const items = ref(null)
     const loading = ref(false)
     const error = ref(null)
 
@@ -14,7 +14,7 @@ export const useItemStore = defineStore('items', () => {
         error.value = null
         try {
             const response = await axios.get('http://localhost:8000/api/items')
-            data.value = response.data
+            items.value = response.data
         } catch (err) {
             error.value = err.message
         } finally {
@@ -24,6 +24,6 @@ export const useItemStore = defineStore('items', () => {
 
     // Expose state and actions
     return {
-        data, loading, error, fetchItems
+        items, loading, error, fetchItems
     }
 })
