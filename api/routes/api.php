@@ -3,6 +3,7 @@
 use App\Http\Controllers\AccountController;
 use App\Http\Controllers\AdvertisementController;
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\CartController;
 use App\Http\Controllers\CurrencyController;
 use App\Http\Controllers\GameController;
 use App\Http\Controllers\ItemController;
@@ -24,6 +25,13 @@ Route::middleware(['auth:sanctum'])->prefix('stripe')->name('stripe.')->group(fu
     Route::post('/subscribe', [PaymentController::class, 'createSubscriptionCheckoutSession']);
     Route::post('/cancel-subscription', [SubscriptionController::class, 'cancelSubscription']);
     Route::get('/subscription-status', [SubscriptionController::class, 'subscriptionStatus']);
+});
+
+Route::middleware('auth:sanctum')->group(function () {
+    Route::post('/cart/add', [CartController::class, 'add']);
+    Route::get('/cart', [CartController::class, 'getCart']);
+    Route::post('/cart/remove', [CartController::class, 'remove']);
+    Route::post('/cart/update', [CartController::class, 'update']);
 });
 
 Route::group(['prefix' => 'games'], function () {

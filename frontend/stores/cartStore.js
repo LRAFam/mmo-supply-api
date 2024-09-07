@@ -1,72 +1,63 @@
 import { defineStore } from 'pinia'
-import { computed, ref, watch, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
+import axios from 'axios'
 
 export const useCartStore = defineStore('cart', () => {
-    const CART_STORAGE_KEY = 'cartItems'
+    const userId = 'user_id';
+    const cartItems = ref([]);
+    const apiUrl = 'http://localhost:8000/api/cart';
 
-    // Initialize cartItems as a ref
-    const cartItems = ref([])
-
-    // Load initial cart from localStorage (client-side only)
-    const loadCartItems = () => {
-        if (process.client) {
-            const storedCart = localStorage.getItem(CART_STORAGE_KEY)
-            cartItems.value = storedCart ? JSON.parse(storedCart) : []
+    // Fetch cart items from the backend
+    const fetchCartItems = async () => {
+        try {
+            const response = await axios.get(apiUrl, { headers: { Authorization: `Bearer ${yourAuthToken}` } });
+            cartItems.value = response.data;
+        } catch (error) {
+            console.error('Failed to fetch cart items', error);
         }
     }
 
-    onMounted(loadCartItems)
-
     // Add an item to the cart
-    const addItemToCart = (newItem) => {
-        const existingItem = cartItems.value.find(item => item.id === newItem.id)
-        if (existingItem) {
-            existingItem.quantity += newItem.quantity
-        } else {
-            cartItems.value.push({ ...newItem, quantity: newItem.quantity, finalPrice: Number(newItem.finalPrice) })
+    const addItemToCart = async (newItem) => {
+        try {
+            const response = await axios.post(`${apiUrl}/add`, { item: newItem }, { headers: { Authorization: `Bearer ${yourAuthToken}` } });
+            cartItems.value = response.data;
+        } catch (error) {
+            console.error('Failed to add item to cart', error);
         }
-        // Save to localStorage
-        saveCartItems()
     }
 
     // Remove an item from the cart
-    const removeItemFromCart = (itemId) => {
-        cartItems.value = cartItems.value.filter(item => item.id !== itemId)
-        saveCartItems()
+    const removeItemFromCart = async (itemId) => {
+        try {
+            const response = await axios.post(`${apiUrl}/remove`, { itemId }, { headers: { Authorization: `Bearer ${yourAuthToken}` } });
+            cartItems.value = response.data;
+        } catch (error) {
+            console.error('Failed to remove item from cart', error);
+        }
     }
 
     // Update item quantity
-    const updateItemQuantity = (itemId, newQuantity) => {
-        cartItems.value = cartItems.value.map(item => {
-            if (item.id === itemId) {
-                return { ...item, quantity: newQuantity <= 0 ? 0 : newQuantity }
-            }
-            return item
-        }).filter(item => item.quantity > 0)
-        saveCartItems()
-    }
-
-    // Save cartItems to localStorage
-    const saveCartItems = () => {
-        if (process.client) {
-            localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(cartItems.value))
+    const updateItemQuantity = async (items) => {
+        try {
+            const response = await axios.post(`${apiUrl}/update`, { items }, { headers: { Authorization: `Bearer ${yourAuthToken}` } });
+            cartItems.value = response.data;
+        } catch (error) {
+            console.error('Failed to update item quantity', error);
         }
     }
 
     // Total items in the cart
     const totalItems = computed(() => {
-        return cartItems.value.reduce((total, item) => total + item.quantity, 0)
+        return cartItems.value.reduce((total, item) => total + item.quantity, 0);
     })
 
     // Calculate total price of the cart
     const totalPrice = computed(() => {
-        return cartItems.value.reduce((total, item) => total + (item.quantity * item.finalPrice), 0).toFixed(2)
+        return cartItems.value.reduce((total, item) => total + (item.quantity * item.finalPrice), 0).toFixed(2);
     })
 
-    // Watch cartItems and save to localStorage (client-side only)
-    if (process.client) {
-        watch(cartItems, saveCartItems, { deep: true })
-    }
+    onMounted(fetchCartItems);
 
     return {
         cartItems,
