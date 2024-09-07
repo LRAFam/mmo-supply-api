@@ -35,11 +35,8 @@
             <span>${{ account.price }}</span>
           </div>
           <div class="flex items-center justify-center gap-4 mt-2">
-            <button class="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded">
-              Details
-            </button>
             <button @click="addToCart(account)" class="w-full bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded">
-              Purchase
+              Add to Cart
             </button>
           </div>
         </div>
@@ -81,40 +78,40 @@
 </template>
 
 <script setup>
-  import { onMounted, ref } from 'vue'
-  import { storeToRefs } from 'pinia'
-  import { useRuntimeConfig } from '#app'
-  import { useAccountStore } from '~/stores/accountStore'
-  import { useCartStore } from '~/stores/cartStore.js'
+import { onMounted, ref } from 'vue'
+import { storeToRefs } from 'pinia'
+import { useRuntimeConfig } from '#app'
+import { useAccountStore } from '~/stores/accountStore'
+import { useCartStore } from '~/stores/cartStore.js'
 
-  const config = useRuntimeConfig()
-  const apiBase = config.public.apiBase
+const config = useRuntimeConfig()
+const apiBase = config.public.apiBase
 
-  const accountStore = useAccountStore()
-  const { loading, error, fetchAccounts } = accountStore
-  const { accounts } = storeToRefs(accountStore)
+const accountStore = useAccountStore()
+const { loading, error, fetchAccounts } = accountStore
+const { accounts } = storeToRefs(accountStore)
 
-  const cartStore = useCartStore()
-  const { addItemToCart, removeItemFromCart, updateItemQuantity } = cartStore
-  const { cartItems, totalItems, totalPrice } = storeToRefs(cartStore)
+const cartStore = useCartStore()
+const { addItemToCart, removeItemFromCart, updateItemQuantity } = cartStore
+const { cartItems, totalItems, totalPrice } = storeToRefs(cartStore)
 
-  const cartOpen = ref(false)
+const cartOpen = ref(false)
 
-  const toggleCart = () => {
-    cartOpen.value = !cartOpen.value
-  }
+const toggleCart = () => {
+  cartOpen.value = !cartOpen.value
+}
 
-  const addToCart = (item) => {
-    const priceAfterDiscount = item.discount ? (item.price - item.discount) : item.price
-    addItemToCart({
-      id: item.id,
-      name: item.title, // Changed from `item.name` to `item.title` based on the template
-      finalPrice: priceAfterDiscount,
-      quantity: 1
-    })
-  }
-
-  onMounted(() => {
-    fetchAccounts()
+const addToCart = (item) => {
+  const priceAfterDiscount = item.discount ? (item.price - item.discount) : item.price
+  addItemToCart({
+    id: item.id,
+    name: item.title,
+    finalPrice: priceAfterDiscount,
+    quantity: 1
   })
+}
+
+onMounted(() => {
+  fetchAccounts()
+})
 </script>
