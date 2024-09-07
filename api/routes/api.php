@@ -6,6 +6,7 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\CurrencyController;
 use App\Http\Controllers\GameController;
 use App\Http\Controllers\ItemController;
+use App\Http\Controllers\ServiceController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware(['auth:sanctum'])->prefix('users')->name('users')->group(function () {
@@ -27,6 +28,10 @@ Route::middleware(['auth:sanctum'])->prefix('stripe')->name('stripe.')->group(fu
 
 Route::group(['prefix' => 'games'], function () {
     Route::get('/', [GameController::class, 'index'])->name('.index');
+});
+
+Route::group(['prefix' => 'services'], function () {
+    Route::get('/', [ServiceController::class, 'index'])->name('.index');
 });
 
 Route::group(['prefix' => 'items'], function () {
