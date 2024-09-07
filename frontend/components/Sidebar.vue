@@ -42,7 +42,7 @@ import { faHome, faGamepad, faCoins, faUser, faTools, faPhone, faShieldAlt } fro
 const menuItems = [
   { name: 'Home', path: '/', icon: faHome },
   { name: 'Games', path: '/games', icon: faGamepad },
-  { name: 'Gold', path: '/gold', icon: faCoins },
+  { name: 'Currencies', path: '/currencies', icon: faCoins },
   { name: 'Items', path: '/items', icon: faShieldAlt },  // Icon like a shield for items
   { name: 'Accounts', path: '/accounts', icon: faUser },
   { name: 'Services', path: '/services', icon: faTools },

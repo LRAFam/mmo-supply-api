@@ -3,9 +3,9 @@
 use App\Http\Controllers\AccountController;
 use App\Http\Controllers\AdvertisementController;
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\CurrencyController;
 use App\Http\Controllers\GameController;
 use App\Http\Controllers\ItemController;
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware(['auth:sanctum'])->prefix('users')->name('users')->group(function () {
@@ -31,6 +31,10 @@ Route::group(['prefix' => 'games'], function () {
 
 Route::group(['prefix' => 'items'], function () {
     Route::get('/', [ItemController::class, 'index'])->name('.index');
+});
+
+Route::group(['prefix' => 'currencies'], function () {
+    Route::get('/', [CurrencyController::class, 'index'])->name('.index');
 });
 
 Route::group(['prefix' => 'accounts'], function () {
