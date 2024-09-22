@@ -1,6 +1,6 @@
 <template>
   <div
-    :class="['h-screen bg-gray-800 text-white flex flex-col transition-width duration-300', { 'w-64': !isCollapsed, 'w-16': isCollapsed }]">
+    :class="['h-screen overflow-y-auto bg-gray-800 text-white flex flex-col transition-width duration-300', { 'w-64': !isCollapsed, 'w-16': isCollapsed }]">
     <!-- Sidebar Header with Toggle Button -->
     <div class="p-4 flex justify-between items-center border-b border-gray-700">
       <span v-if="!isCollapsed" class="text-xl font-bold whitespace-nowrap">MMO Supply</span>
@@ -27,6 +27,51 @@
       </li>
     </ul>
 
+    <!-- In this block I want you to be creative whilst keeping inline with the rest of the flow, create a logged in user perspective.  -->
+    <div v-if="isAuthenticated" class="p-4 flex flex-col">
+      <div class="flex items-center mb-4">
+        <FontAwesomeIcon icon="faUser" class="h-8 w-8 text-gray-300" />
+        <span class="ml-2 font-semibold">Welcome, {{ user.name }}</span>
+        <button @click="toggleUserOptions" class="ml-2 text-gray-400 hover:text-white">
+          <svg :class="{ 'rotate-180': areUserOptionsVisible }" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M6 15l6-6 6 6" />
+          </svg>
+        </button>
+      </div>
+
+      <div v-if="areUserOptionsVisible" class="flex-grow">
+        <ul>
+          <li class="mb-4">
+            <nuxt-link to="/profile" class="block px-4 py-2 rounded hover:bg-gray-700 transition-colors">
+              Profile
+            </nuxt-link>
+          </li>
+          <li class="mb-4">
+            <nuxt-link to="/orders" class="block px-4 py-2 rounded hover:bg-gray-700 transition-colors">
+              My Orders
+            </nuxt-link>
+          </li>
+          <li class="mb-4">
+            <nuxt-link to="/settings" class="block px-4 py-2 rounded hover:bg-gray-700 transition-colors">
+              Settings
+            </nuxt-link>
+          </li>
+        </ul>
+      </div>
+
+      <button @click="logout" class="mt-5 bg-red-600 hover:bg-red-700 text-center align-middle w-full h-auto py-2 rounded-md uppercase">
+        Logout
+      </button>
+    </div>
+    <div v-else class="flex items-center justify-center gap-5 m-5">
+      <nuxt-link to="/auth/login" class="bg-gray-600 hover:bg-gray-700 text-center align-middle w-full h-auto py-2 rounded-md uppercase">
+        Login
+      </nuxt-link>
+      <nuxt-link to="/auth/register" class="bg-gray-600 hover:bg-gray-700 text-center align-middle w-full h-auto py-2 rounded-md uppercase">
+        Register
+      </nuxt-link>
+    </div>
+
     <!-- Sidebar Footer -->
     <div class="p-4 text-sm text-gray-400 border-t border-gray-700" v-if="!isCollapsed">
       © 2024 MMO Supply
@@ -35,7 +80,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue';
+import { ref, onMounted } from 'vue'
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
 import { faHome, faGamepad, faCoins, faUser, faTools, faPhone, faShieldAlt } from '@fortawesome/free-solid-svg-icons'
 
@@ -52,11 +97,33 @@ const menuItems = [
 // Sidebar collapse state
 const isCollapsed = ref(false);
 
+const { isAuthenticated } = useSanctumAuth();
+
+const user = useSanctumUser();
+
+const router = useRouter();
+
+const areUserOptionsVisible = ref(false);
+
+// Toggle the visibility of user options
+const toggleUserOptions = () => {
+  areUserOptionsVisible.value = !areUserOptionsVisible.value;
+};
+
 // Toggle the sidebar collapsed/expanded state
 const toggleSidebar = () => {
   isCollapsed.value = !isCollapsed.value;
   if (process.client) {
     localStorage.setItem('isCollapsed', isCollapsed.value);
+  }
+};
+
+const logout = async () => {
+  try {
+    await useSanctumAuth().logout();
+    await router.push('/');
+  } catch (error) {
+    console.error('Logout failed:', error);
   }
 };
 

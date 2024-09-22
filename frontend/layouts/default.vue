@@ -1,11 +1,11 @@
 <template>
-  <div class="flex h-screen">
+  <div class="flex h-screen overflow-auto">
     <!-- Sidebar -->
     <Sidebar />
 
     <!-- Main content area -->
     <div
-        class="flex-grow bg-gray-100 overflow-y-auto transition-all duration-300">
+        class="h-screen flex-grow bg-gray-900 overflow-y-auto transition-all duration-300">
 
       <!-- Main page content -->
       <NuxtPage />
@@ -14,21 +14,11 @@
 </template>
 
 <script setup>
-import { ref } from 'vue';
 import Sidebar from '~/components/Sidebar.vue';
 
-// Sidebar collapse state
-const isSidebarCollapsed = ref(false);
+const { isAuthenticated } = useSanctumAuth();
 
-// Toggle sidebar collapse state
-const toggleSidebar = () => {
-  isSidebarCollapsed.value = !isSidebarCollapsed.value;
-};
 </script>
 
 <style scoped>
-/* Removed ml-64 and only kept ml-16 */
-.ml-16 {
-  margin-left: 4rem;
-}
 </style>

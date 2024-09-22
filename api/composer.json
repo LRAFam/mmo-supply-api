@@ -9,8 +9,11 @@
         "filament/filament": "^3.2",
         "laravel/framework": "^11.9",
         "laravel/sanctum": "^4.0",
+        "laravel/socialite": "^5.16",
         "laravel/tinker": "^2.9",
-        "stripe/stripe-php": "^15.8"
+        "socialiteproviders/discord": "^4.2",
+        "stripe/stripe-php": "^15.8",
+        "ext-http": "*"
     },
     "require-dev": {
         "fakerphp/faker": "^1.23",

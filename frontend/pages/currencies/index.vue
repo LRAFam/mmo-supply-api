@@ -21,7 +21,7 @@
 
     <!-- Main Content -->
     <template v-else>
-      <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+      <div class="h-screen overflow-auto grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
         <div v-for="currency in currencies" :key="currency.id" class="bg-gray-800 p-4 rounded-lg shadow-lg">
           {{ currency.user.name }}
           {{ currency.stock }}

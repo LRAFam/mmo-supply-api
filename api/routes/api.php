@@ -7,10 +7,22 @@ use App\Http\Controllers\CartController;
 use App\Http\Controllers\CurrencyController;
 use App\Http\Controllers\GameController;
 use App\Http\Controllers\ItemController;
+use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\ServiceController;
+use App\Http\Controllers\SubscriptionController;
+use App\Http\Controllers\UserController;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Http\Request;
 
-Route::middleware(['auth:sanctum'])->prefix('users')->name('users')->group(function () {
+Route::middleware('auth')->get('/user', function (Request $request) {
+    return $request->user();
+});
+
+Route::get('/sanctum/csrf-cookie', function () {
+    return response()->json(['message' => 'CSRF token set', 'token' => csrf_token()]);
+});
+
+Route::middleware(['auth'])->prefix('users')->name('users')->group(function () {
     Route::get('/', [UserController::class, 'index'])->name('.index');
     Route::get('/me', [UserController::class, 'getMe'])->name('.me');
     Route::get('/me/subscriptions', [UserController::class, 'getMySubscriptions'])->name('.mySubscriptions');
@@ -72,7 +84,7 @@ Route::group(['prefix' => 'advertisements'], function () {
 //    Route::get('/', [ProductController::class, 'index'])->name('products.index');
 //});
 
-Route::middleware(['web'])->group(function () {
+Route::middleware(['api'])->group(function () {
     Route::prefix('auth')->group(function () {
         Route::get('discord', [AuthController::class, 'redirectToProvider']);
         Route::get('discord/callback', [AuthController::class, 'handleProviderCallback']);

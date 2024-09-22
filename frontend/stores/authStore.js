@@ -1,19 +1,64 @@
-import { defineStore } from 'pinia'
-import { ref } from 'vue'
+import { defineStore } from 'pinia';
 
-export const useAuthStore = defineStore('auth', () => {
-    const token = ref(localStorage.getItem('authToken') || null)
+export const useAuthStore = defineStore('auth', {
+    state: () => ({
+        user: null,
+    }),
+    actions: {
+        async login(credentials) {
+            const { login, isAuthenticated } = useSanctumAuth();
 
-    const setToken = (newToken) => {
-        token.value = newToken
-        localStorage.setItem('authToken', newToken)
-    }
+            try {
+                await login(credentials);
+                if (isAuthenticated.value) {
+                    // Fetch user data after login to update the store
+                    this.user = await this.fetchUser();
+                }
+            } catch (error) {
+                console.error('Login failed:', error);
+            }
+        },
 
-    const getToken = () => token.value
+        async register(credentials) {
+            const client = useSanctumClient();
 
-    return {
-        token,
-        setToken,
-        getToken,
-    }
-})
+            try {
+                // Ensure you're sending credentials as form data
+                const response = await client('/api/auth/register', {
+                    method: 'POST',
+                    body: new URLSearchParams(credentials),
+                });
+
+                if (response) {
+                    this.user = response.user;
+                }
+            } catch (error) {
+                console.error('Registration failed:', error);
+            }
+        },
+
+        async fetchUser() {
+            const client = useSanctumClient();
+
+            try {
+                const { data } = await client('/api/user');
+                this.user = data;
+                return data;
+            } catch (error) {
+                console.error('Failed to fetch user data:', error);
+                return null;
+            }
+        },
+
+        async logout() {
+            const { logout } = useSanctumAuth();
+
+            try {
+                await logout();
+                this.user = null;
+            } catch (error) {
+                console.error('Logout failed:', error);
+            }
+        },
+    },
+});
