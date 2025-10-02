@@ -36,6 +36,9 @@ Route::middleware('auth:sanctum')->get('/user', [UserController::class, 'me']);
 // Public platform stats
 Route::get('/stats', [StatsController::class, 'getPlatformStats']);
 
+// Public leaderboard (anyone can view rankings)
+Route::get('/leaderboard', [LeaderboardController::class, 'index']);
+
 Route::get('/sanctum/csrf-cookie', function () {
     return response()->json(['message' => 'CSRF token set', 'token' => csrf_token()]);
 });
@@ -103,8 +106,7 @@ Route::middleware('auth:sanctum')->group(function () {
     // Provider Tier Progress (volume-based)
     Route::get('/provider/tier-progress', [UserController::class, 'getTierProgress']);
 
-    // Leaderboard with Rewards
-    Route::get('/leaderboard', [LeaderboardController::class, 'index']);
+    // Leaderboard history (requires auth to see your own history)
     Route::get('/leaderboard/history', [LeaderboardController::class, 'userHistory']);
 
     // Featured Listings
