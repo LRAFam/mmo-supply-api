@@ -10,6 +10,12 @@ $CREATE_RELEASE()
 
 cd $FORGE_RELEASE_DIRECTORY
 
+# Copy .env.example to .env if .env doesn't exist
+if [ ! -f .env ]; then
+    cp .env.example .env
+    echo ".env created from .env.example"
+fi
+
 # Create storage directories BEFORE composer install
 mkdir -p storage/framework/cache/data
 mkdir -p storage/framework/sessions
