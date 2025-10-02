@@ -40,13 +40,13 @@ Route::get('/sanctum/csrf-cookie', function () {
     return response()->json(['message' => 'CSRF token set', 'token' => csrf_token()]);
 });
 
-Route::middleware(['auth:sanctum'])->prefix('users')->name('users')->group(function () {
-    Route::get('/', [UserController::class, 'index'])->name('.index');
-    Route::get('/me', [UserController::class, 'me'])->name('.me');
-    Route::get('/me/subscriptions', [UserController::class, 'getMySubscriptions'])->name('.mySubscriptions');
-    Route::get('/me/stats', [UserStatsController::class, 'getUserStats'])->name('.myStats');
-    Route::get('/{user}', [UserController::class, 'show'])->name('.show');
-    Route::put('/edit', [UserController::class, 'edit'])->name('.edit');
+Route::middleware(['auth:sanctum'])->prefix('users')->name('users.')->group(function () {
+    Route::get('/', [UserController::class, 'index'])->name('index');
+    Route::get('/me', [UserController::class, 'me'])->name('me');
+    Route::get('/me/subscriptions', [UserController::class, 'getMySubscriptions'])->name('mySubscriptions');
+    Route::get('/me/stats', [UserStatsController::class, 'getUserStats'])->name('myStats');
+    Route::get('/{user}', [UserController::class, 'show'])->name('show');
+    Route::put('/edit', [UserController::class, 'edit'])->name('edit');
 });
 
 Route::middleware(['auth:sanctum'])->prefix('stripe')->name('stripe.')->group(function () {
@@ -163,41 +163,41 @@ Route::middleware('auth:sanctum')->prefix('admin')->group(function () {
 });
 
 Route::group(['prefix' => 'games'], function () {
-    Route::get('/', [GameController::class, 'index'])->name('.index');
-    Route::get('/{id}', [GameController::class, 'show'])->name('.show');
+    Route::get('/', [GameController::class, 'index'])->name('games.index');
+    Route::get('/{id}', [GameController::class, 'show'])->name('games.show');
 });
 
 Route::group(['prefix' => 'services'], function () {
-    Route::get('/', [ServiceController::class, 'index'])->name('.index');
-    Route::get('/{id}', [ServiceController::class, 'show'])->name('.show');
-    Route::post('/', [ServiceController::class, 'store'])->middleware('auth:sanctum')->name('.store');
+    Route::get('/', [ServiceController::class, 'index'])->name('services.index');
+    Route::get('/{id}', [ServiceController::class, 'show'])->name('services.show');
+    Route::post('/', [ServiceController::class, 'store'])->middleware('auth:sanctum')->name('services.store');
 });
 
 Route::group(['prefix' => 'items'], function () {
-    Route::get('/', [ItemController::class, 'index'])->name('.index');
-    Route::get('/{id}', [ItemController::class, 'show'])->name('.show');
-    Route::post('/', [ItemController::class, 'store'])->middleware('auth:sanctum')->name('.store');
+    Route::get('/', [ItemController::class, 'index'])->name('items.index');
+    Route::get('/{id}', [ItemController::class, 'show'])->name('items.show');
+    Route::post('/', [ItemController::class, 'store'])->middleware('auth:sanctum')->name('items.store');
 });
 
 Route::group(['prefix' => 'currencies'], function () {
-    Route::get('/', [CurrencyController::class, 'index'])->name('.index');
-    Route::get('/{id}', [CurrencyController::class, 'show'])->name('.show');
-    Route::post('/', [CurrencyController::class, 'store'])->middleware('auth:sanctum')->name('.store');
+    Route::get('/', [CurrencyController::class, 'index'])->name('currencies.index');
+    Route::get('/{id}', [CurrencyController::class, 'show'])->name('currencies.show');
+    Route::post('/', [CurrencyController::class, 'store'])->middleware('auth:sanctum')->name('currencies.store');
 });
 
 Route::group(['prefix' => 'accounts'], function () {
-    Route::get('/', [AccountController::class, 'index'])->name('.index');
-    Route::get('/{id}', [AccountController::class, 'show'])->name('.show');
-    Route::post('/', [AccountController::class, 'store'])->middleware('auth:sanctum')->name('.store');
+    Route::get('/', [AccountController::class, 'index'])->name('accounts.index');
+    Route::get('/{id}', [AccountController::class, 'show'])->name('accounts.show');
+    Route::post('/', [AccountController::class, 'store'])->middleware('auth:sanctum')->name('accounts.store');
 });
 
 Route::group(['prefix' => 'advertisements'], function () {
-    Route::get('/', [AdvertisementController::class, 'index'])->name('.index');
+    Route::get('/', [AdvertisementController::class, 'index'])->name('advertisements.index');
 });
 
 Route::group(['prefix' => 'providers'], function () {
-    Route::get('/', [ProviderController::class, 'index'])->name('.index');
-    Route::get('/{id}', [ProviderController::class, 'show'])->name('.show');
+    Route::get('/', [ProviderController::class, 'index'])->name('providers.index');
+    Route::get('/{id}', [ProviderController::class, 'show'])->name('providers.show');
 });
 
 //Route::group(['prefix' => 'posts'], function () {
