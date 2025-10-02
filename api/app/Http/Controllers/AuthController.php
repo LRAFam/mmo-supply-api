@@ -7,7 +7,11 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Str;
 use Laravel\Socialite\Facades\Socialite;
 
 class AuthController extends Controller
@@ -72,7 +76,7 @@ class AuthController extends Controller
         $request->validate([
             'name' => 'required|string|max:20',
             'email' => 'required|string|email|max:255|unique:users',
-            'password' => 'required|string|min:8',
+            'password' => 'required|string|min:8|confirmed',
         ]);
 
         $user = User::create([
@@ -81,28 +85,77 @@ class AuthController extends Controller
             'password' => bcrypt($request->password),
         ]);
 
-        // Log in the user after registration
-        Auth::login($user);
+        // Create wallet for new user
+        $user->wallet()->create(['balance' => 0]);
 
-        return response()->json(['user' => $user, 'message' => 'User registered successfully'], 201);
+        // Send verification email
+        $this->sendVerificationEmail($user);
+
+        $token = $user->createToken('auth_token')->plainTextToken;
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Registration successful! Please check your email to verify your account.',
+            'user' => [
+                'id' => $user->id,
+                'name' => $user->name,
+                'email' => $user->email,
+                'email_verified_at' => $user->email_verified_at,
+                'created_at' => $user->created_at,
+                'is_seller' => $user->is_seller ?? false,
+                'subscription_tier' => $user->getSubscriptionTier(),
+                'wallet' => [
+                    'balance' => 0,
+                ],
+            ],
+            'token' => $token,
+        ], 201);
     }
 
     /**
-     * Login user (cookie-based authentication).
+     * Login user (token-based authentication).
      */
     public function login(Request $request): JsonResponse
     {
         $request->validate([
-            'name' => 'required',
+            'email' => 'required|email',
             'password' => 'required',
         ]);
 
-        if (Auth::attempt($request->only('name', 'password'))) {
-            $user = Auth::user();
-            return response()->json(['user' => $user]);
+        if (!Auth::attempt($request->only('email', 'password'))) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Invalid credentials',
+            ], 401);
         }
 
-        return response()->json(['error' => 'Invalid credentials'], 401);
+        $user = Auth::user();
+
+        // Revoke existing tokens for security
+        $user->tokens()->delete();
+
+        $token = $user->createToken('auth_token')->plainTextToken;
+
+        // Load wallet relationship
+        $user->load('wallet');
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Login successful',
+            'user' => [
+                'id' => $user->id,
+                'name' => $user->name,
+                'email' => $user->email,
+                'email_verified_at' => $user->email_verified_at,
+                'created_at' => $user->created_at,
+                'is_seller' => $user->is_seller ?? false,
+                'subscription_tier' => $user->getSubscriptionTier(),
+                'wallet' => [
+                    'balance' => $user->wallet->balance ?? 0,
+                ],
+            ],
+            'token' => $token,
+        ]);
     }
 
     /**
@@ -110,22 +163,217 @@ class AuthController extends Controller
      */
     public function logout(Request $request): JsonResponse
     {
-        Auth::logout();
-        $request->session()->invalidate();
-        $request->session()->regenerateToken();
+        $request->user()->currentAccessToken()->delete();
 
-        return response()->json(['message' => 'Logged out successfully']);
+        return response()->json([
+            'success' => true,
+            'message' => 'Logged out successfully',
+        ]);
     }
 
     /**
-     * Refresh the session (if needed).
+     * Send verification email to user.
      */
-    public function refresh(Request $request): JsonResponse
+    private function sendVerificationEmail(User $user): void
     {
-        $user = $request->user();
-        if ($user) {
-            Auth::login($user);
+        $token = Str::random(60);
+
+        // Store verification token
+        DB::table('password_reset_tokens')->updateOrInsert(
+            ['email' => $user->email],
+            [
+                'token' => Hash::make($token),
+                'created_at' => now(),
+            ]
+        );
+
+        $verificationUrl = config('app.frontend_url') . '/auth/verify-email?token=' . $token . '&email=' . urlencode($user->email);
+
+        Mail::to($user->email)->send(new \App\Mail\VerifyEmailMail($user, $verificationUrl));
+    }
+
+    /**
+     * Resend verification email.
+     */
+    public function resendVerification(Request $request): JsonResponse
+    {
+        $request->validate([
+            'email' => 'required|email',
+        ]);
+
+        $user = User::where('email', $request->email)->first();
+
+        if (!$user) {
+            return response()->json([
+                'success' => false,
+                'message' => 'User not found',
+            ], 404);
         }
-        return response()->json(['message' => 'Session refreshed']);
+
+        if ($user->email_verified_at) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Email already verified',
+            ], 400);
+        }
+
+        $this->sendVerificationEmail($user);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Verification email sent successfully',
+        ]);
+    }
+
+    /**
+     * Verify email address.
+     */
+    public function verifyEmail(Request $request): JsonResponse
+    {
+        $request->validate([
+            'email' => 'required|email',
+            'token' => 'required|string',
+        ]);
+
+        $user = User::where('email', $request->email)->first();
+
+        if (!$user) {
+            return response()->json([
+                'success' => false,
+                'message' => 'User not found',
+            ], 404);
+        }
+
+        if ($user->email_verified_at) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Email already verified',
+            ], 400);
+        }
+
+        $tokenRecord = DB::table('password_reset_tokens')
+            ->where('email', $request->email)
+            ->first();
+
+        if (!$tokenRecord || !Hash::check($request->token, $tokenRecord->token)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Invalid or expired verification link',
+            ], 400);
+        }
+
+        // Check if token is expired (60 minutes)
+        if (now()->diffInMinutes($tokenRecord->created_at) > 60) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Verification link has expired',
+            ], 400);
+        }
+
+        // Mark email as verified
+        $user->email_verified_at = now();
+        $user->save();
+
+        // Delete verification token
+        DB::table('password_reset_tokens')->where('email', $request->email)->delete();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Email verified successfully!',
+        ]);
+    }
+
+    /**
+     * Send password reset link.
+     */
+    public function forgotPassword(Request $request): JsonResponse
+    {
+        $request->validate([
+            'email' => 'required|email',
+        ]);
+
+        $user = User::where('email', $request->email)->first();
+
+        if (!$user) {
+            // Don't reveal if user exists
+            return response()->json([
+                'success' => true,
+                'message' => 'If an account exists with that email, a password reset link has been sent.',
+            ]);
+        }
+
+        $token = Str::random(60);
+
+        DB::table('password_reset_tokens')->updateOrInsert(
+            ['email' => $user->email],
+            [
+                'token' => Hash::make($token),
+                'created_at' => now(),
+            ]
+        );
+
+        $resetUrl = config('app.frontend_url') . '/auth/reset-password?token=' . $token . '&email=' . urlencode($user->email);
+
+        Mail::to($user->email)->send(new \App\Mail\ResetPasswordMail($user->email, $resetUrl));
+
+        return response()->json([
+            'success' => true,
+            'message' => 'If an account exists with that email, a password reset link has been sent.',
+        ]);
+    }
+
+    /**
+     * Reset password.
+     */
+    public function resetPassword(Request $request): JsonResponse
+    {
+        $request->validate([
+            'email' => 'required|email',
+            'token' => 'required|string',
+            'password' => 'required|string|min:8|confirmed',
+        ]);
+
+        $user = User::where('email', $request->email)->first();
+
+        if (!$user) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Invalid reset link',
+            ], 400);
+        }
+
+        $tokenRecord = DB::table('password_reset_tokens')
+            ->where('email', $request->email)
+            ->first();
+
+        if (!$tokenRecord || !Hash::check($request->token, $tokenRecord->token)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Invalid or expired reset link',
+            ], 400);
+        }
+
+        // Check if token is expired (60 minutes)
+        if (now()->diffInMinutes($tokenRecord->created_at) > 60) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Reset link has expired',
+            ], 400);
+        }
+
+        // Update password
+        $user->password = bcrypt($request->password);
+        $user->save();
+
+        // Delete reset token
+        DB::table('password_reset_tokens')->where('email', $request->email)->delete();
+
+        // Revoke all existing tokens for security
+        $user->tokens()->delete();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Password reset successfully! You can now login with your new password.',
+        ]);
     }
 }

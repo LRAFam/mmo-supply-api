@@ -45,4 +45,17 @@ return [
         'avatar_default_extension' => env('DISCORD_EXTENSION_DEFAULT', 'png'), // only pick from jpg, png, webp
     ],
 
+    'stripe' => [
+        'key' => env('STRIPE_KEY'),
+        'secret' => env('STRIPE_SECRET'),
+        'webhook_secret' => env('STRIPE_WEBHOOK_SECRET'),
+        'premium_price_id' => env('STRIPE_PREMIUM_PRICE_ID'),
+        'elite_price_id' => env('STRIPE_ELITE_PRICE_ID'),
+    ],
+
+    'nowpayments' => [
+        'api_key' => env('NOWPAYMENTS_API_KEY'),
+        'ipn_secret' => env('NOWPAYMENTS_IPN_SECRET'),
+    ],
+
 ];

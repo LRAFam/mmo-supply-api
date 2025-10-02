@@ -18,10 +18,17 @@ class Item extends Model
         'price',
         'discount',
         'stock',
+        'is_active',
+        'is_featured',
+        'delivery_time',
     ];
 
     protected $casts = [
         'images' => 'array',
+        'price' => 'decimal:2',
+        'discount' => 'decimal:2',
+        'is_active' => 'boolean',
+        'is_featured' => 'boolean',
     ];
 
     public function user(): BelongsTo
@@ -32,5 +39,20 @@ class Item extends Model
     public function game(): BelongsTo
     {
         return $this->belongsTo(Game::class);
+    }
+
+    public function reviews()
+    {
+        return $this->morphMany(Review::class, 'reviewable');
+    }
+
+    public function getFinalPriceAttribute()
+    {
+        return $this->price - ($this->discount ?? 0);
+    }
+
+    public function getAverageRatingAttribute()
+    {
+        return $this->reviews()->avg('rating') ?? 0;
     }
 }

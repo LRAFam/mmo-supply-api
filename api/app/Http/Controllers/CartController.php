@@ -10,27 +10,116 @@ class CartController extends Controller
 {
     public function add(Request $request): JsonResponse
     {
+        $request->validate([
+            'product_type' => 'required|string',
+            'product_id' => 'required|integer',
+            'quantity' => 'required|integer|min:1',
+        ]);
+
         $user = $request->user();
-        $item = $request->input('item');
 
-        $cart = Cart::firstOrCreate(['user_id' => $user->id]);
-        $existingItem = $cart->items->firstWhere('id', $item['id']);
+        // Get or create cart
+        $cart = Cart::firstOrCreate(
+            ['user_id' => $user->id],
+            ['items' => []]
+        );
 
-        if ($existingItem) {
-            $existingItem->quantity += $item['quantity'];
-        } else {
-            $cart->items->push($item);
+        $items = $cart->items ?? [];
+
+        // Check if item already exists in cart
+        $itemExists = false;
+        foreach ($items as $key => $item) {
+            if ($item['product_type'] === $request->product_type &&
+                $item['product_id'] === $request->product_id) {
+                $items[$key]['quantity'] += $request->quantity;
+                $itemExists = true;
+                break;
+            }
         }
 
+        // Add new item if it doesn't exist
+        if (!$itemExists) {
+            $items[] = [
+                'product_type' => $request->product_type,
+                'product_id' => $request->product_id,
+                'quantity' => $request->quantity,
+            ];
+        }
+
+        $cart->items = $items;
         $cart->save();
-        return response()->json($cart->items);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Item added to cart',
+            'cart' => $cart,
+        ]);
     }
 
     public function getCart(Request $request): JsonResponse
     {
         $user = $request->user();
-        $cart = Cart::with('items')->where('user_id', $user->id)->first();
-        return response()->json($cart ? $cart->items : []);
+        $cart = Cart::where('user_id', $user->id)->first();
+
+        if (!$cart || empty($cart->items)) {
+            return response()->json([]);
+        }
+
+        // Load actual product data for each cart item
+        $items = collect($cart->items)->map(function ($item) {
+            $productType = $item['product_type'];
+            $productId = $item['product_id'];
+
+            // Get the model class based on product type (handle both singular and plural)
+            $modelClass = match($productType) {
+                'currency', 'currencies' => \App\Models\Currency::class,
+                'item', 'items' => \App\Models\Item::class,
+                'service', 'services' => \App\Models\Service::class,
+                'account', 'accounts' => \App\Models\Account::class,
+                default => null,
+            };
+
+            if (!$modelClass) {
+                return null;
+            }
+
+            $product = $modelClass::with('game')->find($productId);
+
+            if (!$product) {
+                return null;
+            }
+
+            // Get price based on product type (handle both singular and plural)
+            $price = match($productType) {
+                'currency', 'currencies' => floatval($product->price_per_unit ?? 0),
+                default => floatval($product->price ?? 0),
+            };
+
+            $discount = floatval($product->discount ?? 0);
+
+            return [
+                'id' => $productId . '-' . $productType,
+                'product_type' => $productType,
+                'product_id' => $productId,
+                'quantity' => $item['quantity'],
+                'item' => [
+                    'id' => $product->id,
+                    'name' => $product->name ?? $product->title ?? 'Unknown',
+                    'title' => $product->title ?? $product->name ?? 'Unknown',
+                    'description' => $product->description ?? '',
+                    'price' => $price,
+                    'discount' => $discount,
+                    'images' => $product->images ?? [],
+                    'game' => $product->game ? [
+                        'id' => $product->game->id,
+                        'title' => $product->game->title,
+                    ] : null,
+                ],
+                'finalPrice' => $price - $discount,
+            ];
+        })->filter()->values();
+
+        return response()->json($items);
     }
 
     public function remove(Request $request): JsonResponse
@@ -40,24 +129,67 @@ class CartController extends Controller
 
         $cart = Cart::where('user_id', $user->id)->first();
         if ($cart) {
-            $cart->items = $cart->items->filter(fn($item) => $item['id'] != $itemId);
+            $items = collect($cart->items)->filter(fn($item) => $item['id'] != $itemId)->values()->toArray();
+            $cart->items = $items;
             $cart->save();
+            return response()->json($items);
         }
 
-        return response()->json($cart->items);
+        return response()->json([]);
     }
 
     public function update(Request $request): JsonResponse
     {
-        $user = $request->user();
-        $items = $request->input('items');
+        $request->validate([
+            'product_type' => 'required|string',
+            'product_id' => 'required|integer',
+            'quantity' => 'required|integer|min:0',
+        ]);
 
+        $user = $request->user();
         $cart = Cart::where('user_id', $user->id)->first();
-        if ($cart) {
-            $cart->items = collect($items)->filter(fn($item) => $item['quantity'] > 0);
-            $cart->save();
+
+        if (!$cart) {
+            return response()->json(['error' => 'Cart not found'], 404);
         }
 
-        return response()->json($cart->items);
+        $items = $cart->items ?? [];
+        $updated = false;
+
+        // Find and update the item
+        foreach ($items as $key => $item) {
+            if ($item['product_type'] === $request->product_type &&
+                $item['product_id'] === $request->product_id) {
+
+                if ($request->quantity === 0) {
+                    // Remove item if quantity is 0
+                    unset($items[$key]);
+                } else {
+                    // Update quantity
+                    $items[$key]['quantity'] = $request->quantity;
+                }
+
+                $updated = true;
+                break;
+            }
+        }
+
+        if (!$updated && $request->quantity > 0) {
+            // Item not found, add it
+            $items[] = [
+                'product_type' => $request->product_type,
+                'product_id' => $request->product_id,
+                'quantity' => $request->quantity,
+            ];
+        }
+
+        $cart->items = array_values($items);
+        $cart->save();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Cart updated',
+            'cart' => $cart,
+        ]);
     }
 }

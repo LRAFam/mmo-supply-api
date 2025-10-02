@@ -14,6 +14,9 @@ use Illuminate\Session\Middleware\StartSession;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
 use Laravel\Sanctum\Http\Middleware\EnsureFrontendRequestsAreStateful;
 
+// Suppress deprecation warnings from dependencies not yet compatible with PHP 8.4
+error_reporting(E_ALL & ~E_DEPRECATED);
+
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
         web: __DIR__ . '/../routes/web.php',
@@ -22,18 +25,19 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware) {
-        $middleware->api(append: [
-            EncryptCookies::class,
-            AddQueuedCookiesToResponse::class,
-            StartSession::class,
-            AuthenticateSession::class,
-            ShareErrorsFromSession::class,
-            SubstituteBindings::class,
+        $middleware->api(prepend: [
             HandleCors::class,
+        ]);
+
+        $middleware->api(append: [
+            SubstituteBindings::class,
             ThrottleRequests::class,
         ]);
 
-        $middleware->statefulApi();
+        // Return JSON error for unauthenticated API requests instead of redirect
+        $middleware->redirectGuestsTo(fn () => abort(401, 'Unauthenticated'));
+
+        // Don't use statefulApi() for token-based auth
     })
     ->withExceptions(function (Exceptions $exceptions) {
         //

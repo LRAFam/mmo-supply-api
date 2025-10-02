@@ -18,10 +18,19 @@ class Account extends Model
         'price',
         'discount',
         'stock',
+        'is_active',
+        'is_featured',
+        'account_level',
+        'account_stats',
     ];
 
     protected $casts = [
         'images' => 'array',
+        'account_stats' => 'array',
+        'price' => 'decimal:2',
+        'discount' => 'decimal:2',
+        'is_active' => 'boolean',
+        'is_featured' => 'boolean',
     ];
 
     public function user(): BelongsTo
@@ -32,5 +41,20 @@ class Account extends Model
     public function game(): BelongsTo
     {
         return $this->belongsTo(Game::class);
+    }
+
+    public function reviews()
+    {
+        return $this->morphMany(Review::class, 'reviewable');
+    }
+
+    public function getFinalPriceAttribute()
+    {
+        return $this->price - ($this->discount ?? 0);
+    }
+
+    public function getAverageRatingAttribute()
+    {
+        return $this->reviews()->avg('rating') ?? 0;
     }
 }
