@@ -1,3 +1,11 @@
+cd $FORGE_SITE_PATH
+
+# Ensure .env exists in the site root
+if [ ! -f .env ]; then
+    echo "Error: .env file not found. Please configure environment variables in Forge."
+    exit 1
+fi
+
 $CREATE_RELEASE()
 
 cd $FORGE_RELEASE_DIRECTORY
