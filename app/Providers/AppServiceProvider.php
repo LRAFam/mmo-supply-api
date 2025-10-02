@@ -23,8 +23,9 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        // Define polymorphic morph map for order items
+        // Define polymorphic morph map for order items and subscriptions
         Relation::enforceMorphMap([
+            'user' => \App\Models\User::class,
             'items' => \App\Models\Item::class,
             'accounts' => \App\Models\Account::class,
             'currencies' => \App\Models\Currency::class,
