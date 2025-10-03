@@ -9,10 +9,10 @@ use Illuminate\Http\JsonResponse;
 class AdminController extends Controller
 {
     /**
-     * Set custom creator earnings for a user (admin only)
-     * Useful for special partnerships, influencers, etc.
+     * Set custom seller earnings for a user (admin only)
+     * Useful for special partnerships, high-volume sellers, etc.
      */
-    public function setCreatorEarnings(Request $request, $userId): JsonResponse
+    public function setSellerEarnings(Request $request, $userId): JsonResponse
     {
         // TODO: Add admin middleware check
 
@@ -28,64 +28,64 @@ class AdminController extends Controller
             return response()->json(['error' => 'User is not a seller'], 400);
         }
 
-        $user->setCreatorEarnings(
+        $user->setSellerEarnings(
             $request->earnings_percentage,
             $request->tier
         );
 
         return response()->json([
-            'message' => 'Creator earnings updated successfully',
+            'message' => 'Seller earnings updated successfully',
             'user' => [
                 'id' => $user->id,
                 'name' => $user->name,
-                'creator_earnings_percentage' => $user->creator_earnings_percentage,
-                'creator_tier' => $user->creator_tier,
+                'seller_earnings_percentage' => $user->seller_earnings_percentage,
+                'seller_tier' => $user->seller_tier,
                 'platform_fee_percentage' => $user->getPlatformFeePercentage(),
             ],
         ]);
     }
 
     /**
-     * Get all creators with custom earnings
+     * Get all sellers with custom earnings
      */
-    public function getCustomEarningsCreators(): JsonResponse
+    public function getCustomEarningsSellers(): JsonResponse
     {
         // TODO: Add admin middleware check
 
-        $creators = User::where('is_seller', true)
-            ->whereNotNull('creator_earnings_percentage')
-            ->select('id', 'name', 'email', 'creator_earnings_percentage', 'creator_tier')
+        $sellers = User::where('is_seller', true)
+            ->whereNotNull('seller_earnings_percentage')
+            ->select('id', 'name', 'email', 'seller_earnings_percentage', 'seller_tier')
             ->get()
             ->map(function($user) {
                 return [
                     'id' => $user->id,
                     'name' => $user->name,
                     'email' => $user->email,
-                    'creator_earnings' => $user->creator_earnings_percentage,
-                    'platform_fee' => 100 - $user->creator_earnings_percentage,
-                    'tier' => $user->creator_tier,
+                    'seller_earnings' => $user->seller_earnings_percentage,
+                    'platform_fee' => 100 - $user->seller_earnings_percentage,
+                    'tier' => $user->seller_tier,
                 ];
             });
 
-        return response()->json($creators);
+        return response()->json($sellers);
     }
 
     /**
-     * Reset creator earnings to default (subscription-based)
+     * Reset seller earnings to default (subscription-based)
      */
-    public function resetCreatorEarnings(Request $request, $userId): JsonResponse
+    public function resetSellerEarnings($userId): JsonResponse
     {
         // TODO: Add admin middleware check
 
         $user = User::findOrFail($userId);
 
         $user->update([
-            'creator_earnings_percentage' => null,
-            'creator_tier' => 'standard',
+            'seller_earnings_percentage' => null,
+            'seller_tier' => 'standard',
         ]);
 
         return response()->json([
-            'message' => 'Creator earnings reset to subscription defaults',
+            'message' => 'Seller earnings reset to subscription defaults',
             'user' => [
                 'id' => $user->id,
                 'name' => $user->name,

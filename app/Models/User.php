@@ -31,8 +31,8 @@ class User extends Authenticatable
         'stripe_customer_id',
         'stripe_account_id',
         'stripe_onboarding_complete',
-        'creator_earnings_percentage',
-        'creator_tier',
+        'seller_earnings_percentage',
+        'seller_tier',
         'monthly_sales',
         'lifetime_sales',
         'monthly_sales_reset_at',
@@ -236,17 +236,17 @@ class User extends Authenticatable
      */
     public function getPlatformFeePercentage(): float
     {
-        return 100 - $this->getCreatorEarningsPercentage();
+        return 100 - $this->getSellerEarningsPercentage();
     }
 
     /**
-     * Set custom creator earnings percentage (for special partnerships, etc)
+     * Set custom seller earnings percentage (for special partnerships, etc)
      */
-    public function setCreatorEarnings(float $percentage, string $tier = 'standard'): void
+    public function setSellerEarnings(float $percentage, string $tier = 'standard'): void
     {
         $this->update([
-            'creator_earnings_percentage' => $percentage,
-            'creator_tier' => $tier,
+            'seller_earnings_percentage' => $percentage,
+            'seller_tier' => $tier,
         ]);
     }
 
@@ -285,19 +285,19 @@ class User extends Authenticatable
         if ($this->auto_tier !== $newTier) {
             $this->update([
                 'auto_tier' => $newTier,
-                'creator_tier' => $newTier,
+                'seller_tier' => $newTier,
             ]);
         }
     }
 
     /**
-     * Get the creator earnings based on auto tier (volume-based)
+     * Get the seller earnings based on auto tier (volume-based)
      */
-    public function getCreatorEarningsPercentage(): float
+    public function getSellerEarningsPercentage(): float
     {
         // Check if user has custom earnings percentage set (admin override)
-        if ($this->creator_earnings_percentage) {
-            return floatval($this->creator_earnings_percentage);
+        if ($this->seller_earnings_percentage) {
+            return floatval($this->seller_earnings_percentage);
         }
 
         // Use auto tier based on sales volume

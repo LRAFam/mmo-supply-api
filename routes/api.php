@@ -159,9 +159,9 @@ Route::get('/featured-listings/active', [FeaturedListingController::class, 'getA
 
 // Admin routes (TODO: Add admin middleware)
 Route::middleware('auth:sanctum')->prefix('admin')->group(function () {
-    Route::get('/creators/custom-earnings', [AdminController::class, 'getCustomEarningsCreators']);
-    Route::post('/creators/{userId}/earnings', [AdminController::class, 'setCreatorEarnings']);
-    Route::delete('/creators/{userId}/earnings', [AdminController::class, 'resetCreatorEarnings']);
+    Route::get('/sellers/custom-earnings', [AdminController::class, 'getCustomEarningsSellers']);
+    Route::post('/sellers/{userId}/earnings', [AdminController::class, 'setSellerEarnings']);
+    Route::delete('/sellers/{userId}/earnings', [AdminController::class, 'resetSellerEarnings']);
 });
 
 Route::group(['prefix' => 'games'], function () {
