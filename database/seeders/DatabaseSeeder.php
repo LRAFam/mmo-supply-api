@@ -573,6 +573,9 @@ class DatabaseSeeder extends Seeder
             'is_verified' => true,
         ]);
 
+        // Seed spin wheels and prizes
+        $this->call(SpinWheelSeeder::class);
+
         $this->command->info('Database seeded with RuneScape data!');
     }
 }
