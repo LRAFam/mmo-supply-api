@@ -35,10 +35,10 @@ class SellerSubscription extends Model
     }
 
     /**
-     * Get the creator earnings percentage for this subscription
-     * Returns what percentage the creator/seller keeps
+     * Get the seller earnings percentage for this subscription
+     * Returns what percentage the seller keeps
      */
-    public function getCreatorEarningsPercentage(): float
+    public function getSellerEarningsPercentage(): float
     {
         return match($this->tier) {
             'basic' => 70.0,     // Platform gets 30%
@@ -49,11 +49,11 @@ class SellerSubscription extends Model
     }
 
     /**
-     * Get the platform fee percentage (inverse of creator earnings)
+     * Get the platform fee percentage (inverse of seller earnings)
      */
     public function getPlatformFee(): float
     {
-        return 100 - $this->getCreatorEarningsPercentage();
+        return 100 - $this->getSellerEarningsPercentage();
     }
 
     /**

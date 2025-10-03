@@ -343,7 +343,7 @@ class User extends Authenticatable
             'current_tier' => $currentTier,
             'monthly_sales' => $monthly,
             'lifetime_sales' => $lifetime,
-            'earnings_percentage' => $this->getCreatorEarningsPercentage(),
+            'earnings_percentage' => $this->getSellerEarningsPercentage(),
         ];
 
         // Calculate progress to next tier

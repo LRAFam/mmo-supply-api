@@ -26,7 +26,7 @@ class UserController extends Controller
                 'is_seller' => (bool) $user->is_seller,
                 'subscription_tier' => $user->getSubscriptionTier(),
                 'provider_tier' => $user->auto_tier ?? 'standard',
-                'provider_earnings_percentage' => $user->getCreatorEarningsPercentage(),
+                'provider_earnings_percentage' => $user->getSellerEarningsPercentage(),
                 'wallet' => [
                     'balance' => $user->wallet->balance ?? 0,
                 ],
