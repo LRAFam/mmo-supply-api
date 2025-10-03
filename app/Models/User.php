@@ -3,6 +3,8 @@
 namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
+use Filament\Models\Contracts\FilamentUser;
+use Filament\Panel;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
@@ -11,7 +13,7 @@ use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
 use Laravel\Cashier\Billable;
 
-class User extends Authenticatable
+class User extends Authenticatable implements FilamentUser
 {
     use HasFactory, Notifiable, HasApiTokens, Billable;
 
@@ -24,6 +26,7 @@ class User extends Authenticatable
         'name',
         'email',
         'password',
+        'role',
         'is_seller',
         'wallet_balance',
         'avatar',
@@ -408,5 +411,29 @@ class User extends Authenticatable
     {
         $tier = $this->getSubscriptionTier();
         return \App\Services\SubscriptionService::getPerksForTier($tier, $this->is_seller);
+    }
+
+    /**
+     * Determine if the user can access the Filament admin panel
+     */
+    public function canAccessPanel(Panel $panel): bool
+    {
+        return $this->role === 'admin' || $this->role === 'moderator';
+    }
+
+    /**
+     * Check if user is an admin
+     */
+    public function isAdmin(): bool
+    {
+        return $this->role === 'admin';
+    }
+
+    /**
+     * Check if user is a moderator
+     */
+    public function isModerator(): bool
+    {
+        return $this->role === 'moderator';
     }
 }
