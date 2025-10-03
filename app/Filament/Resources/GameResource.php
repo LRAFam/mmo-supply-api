@@ -33,6 +33,9 @@ class GameResource extends Resource
                 FileUpload::make('logo')
                     ->label('Game Logo')
                     ->image()
+                    ->disk('s3')
+                    ->directory('games/logos')
+                    ->visibility('public')
                     ->maxSize(2048)
                     ->required()
                     ->columnSpan(2),
@@ -40,6 +43,9 @@ class GameResource extends Resource
                 FileUpload::make('icon')
                     ->label('Game Icon')
                     ->image()
+                    ->disk('s3')
+                    ->directory('games/icons')
+                    ->visibility('public')
                     ->maxSize(1024)
                     ->required()
                     ->columnSpan(2),

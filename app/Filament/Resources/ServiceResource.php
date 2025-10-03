@@ -43,6 +43,9 @@ class ServiceResource extends Resource
                     ->label('Service images')
                     ->image()
                     ->multiple()
+                    ->disk('s3')
+                    ->directory('products/services')
+                    ->visibility('public')
                     ->maxSize(2048)
                     ->required()
                     ->columnSpan(2),

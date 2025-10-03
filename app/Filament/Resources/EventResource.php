@@ -45,7 +45,11 @@ class EventResource extends Resource
                     ->relationship('game', 'name')
                     ->searchable(),
                 Forms\Components\FileUpload::make('banner_image')
-                    ->image(),
+                    ->image()
+                    ->disk('s3')
+                    ->directory('events/banners')
+                    ->visibility('public')
+                    ->maxSize(4096),
                 Forms\Components\DateTimePicker::make('starts_at')
                     ->required(),
                 Forms\Components\DateTimePicker::make('ends_at')

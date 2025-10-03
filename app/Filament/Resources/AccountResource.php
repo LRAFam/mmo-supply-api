@@ -44,6 +44,9 @@ class AccountResource extends Resource
                     ->label('Account images')
                     ->image()
                     ->multiple()
+                    ->disk('s3')
+                    ->directory('products/accounts')
+                    ->visibility('public')
                     ->maxSize(2048)
                     ->required()
                     ->columnSpan(2),
