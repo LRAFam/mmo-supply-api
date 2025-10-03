@@ -149,6 +149,14 @@ class User extends Authenticatable
     }
 
     /**
+     * Season participations relationship
+     */
+    public function seasonParticipations()
+    {
+        return $this->hasMany(UserSeasonParticipation::class);
+    }
+
+    /**
      * Event participants
      */
     public function eventParticipations(): HasMany

@@ -17,6 +17,7 @@ use App\Http\Controllers\OrderController;
 use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\ProviderController;
 use App\Http\Controllers\ReviewController;
+use App\Http\Controllers\SeasonController;
 use App\Http\Controllers\SellerSubscriptionController;
 use App\Http\Controllers\ServiceController;
 use App\Http\Controllers\SpinWheelController;
@@ -152,6 +153,14 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/upload/images', [UploadController::class, 'uploadMultipleImages']);
     Route::delete('/upload/image', [UploadController::class, 'deleteImage']);
 });
+
+// Seasons (Public endpoints)
+Route::get('/seasons/current', [SeasonController::class, 'current']);
+Route::get('/seasons', [SeasonController::class, 'index']);
+Route::get('/seasons/{id}', [SeasonController::class, 'show']);
+Route::get('/seasons/{id}/stats', [SeasonController::class, 'stats']);
+Route::get('/seasons/{id}/leaderboard', [SeasonController::class, 'leaderboard']);
+Route::get('/users/{userId}/seasons', [SeasonController::class, 'userSeasons']);
 
 // Public featured listings endpoints
 Route::get('/featured-listings/pricing', [FeaturedListingController::class, 'getPricing']);
