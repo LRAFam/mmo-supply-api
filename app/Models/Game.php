@@ -2,8 +2,10 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Facades\Storage;
 
 class Game extends Model
 {
@@ -23,6 +25,28 @@ class Game extends Model
         'is_featured' => 'boolean',
         'is_active' => 'boolean',
     ];
+
+    protected $appends = ['logo_url', 'icon_url'];
+
+    /**
+     * Get the full URL for the logo
+     */
+    protected function logoUrl(): Attribute
+    {
+        return Attribute::make(
+            get: fn () => $this->logo ? Storage::disk('s3')->url($this->logo) : null,
+        );
+    }
+
+    /**
+     * Get the full URL for the icon
+     */
+    protected function iconUrl(): Attribute
+    {
+        return Attribute::make(
+            get: fn () => $this->icon ? Storage::disk('s3')->url($this->icon) : null,
+        );
+    }
 
     public function items(): HasMany
     {

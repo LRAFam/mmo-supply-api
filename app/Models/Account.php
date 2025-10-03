@@ -2,8 +2,10 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Facades\Storage;
 
 class Account extends Model
 {
@@ -32,6 +34,20 @@ class Account extends Model
         'is_active' => 'boolean',
         'is_featured' => 'boolean',
     ];
+
+    protected $appends = ['images_urls'];
+
+    /**
+     * Get full URLs for all images
+     */
+    protected function imagesUrls(): Attribute
+    {
+        return Attribute::make(
+            get: fn () => $this->images
+                ? array_map(fn($img) => Storage::disk('s3')->url($img), $this->images)
+                : [],
+        );
+    }
 
     public function user(): BelongsTo
     {

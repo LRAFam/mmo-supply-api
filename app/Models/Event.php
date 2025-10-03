@@ -2,9 +2,11 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 
 class Event extends Model
 {
@@ -36,6 +38,18 @@ class Event extends Model
         'requirements' => 'array',
         'is_featured' => 'boolean',
     ];
+
+    protected $appends = ['banner_image_url'];
+
+    /**
+     * Get full URL for banner image
+     */
+    protected function bannerImageUrl(): Attribute
+    {
+        return Attribute::make(
+            get: fn () => $this->banner_image ? Storage::disk('s3')->url($this->banner_image) : null,
+        );
+    }
 
     /**
      * Game relationship
