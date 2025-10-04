@@ -27,7 +27,6 @@ class AdminPanelProvider extends PanelProvider
             ->id('admin')
             ->path('admin')
             ->login()
-            ->defaultFilesystemDisk('s3')
             ->colors([
                 'primary' => Color::Amber,
             ])
