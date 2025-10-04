@@ -148,15 +148,18 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/spin-wheels/{wheelId}', [SpinWheelController::class, 'show']);
     Route::post('/spin-wheels/{wheelId}/spin', [SpinWheelController::class, 'spin']);
 
-    // File Uploads
-    Route::post('/upload/image', [UploadController::class, 'uploadImage']);
-    Route::post('/upload/images', [UploadController::class, 'uploadMultipleImages']);
-    Route::delete('/upload/image', [UploadController::class, 'deleteImage']);
 });
 
-// Game image uploads (accessible without Sanctum auth for Filament admin)
+// Image uploads (accessible without Sanctum auth for Filament admin)
+Route::post('/upload/image', [UploadController::class, 'uploadImage']);
+Route::post('/upload/images', [UploadController::class, 'uploadMultipleImages']);
 Route::post('/upload/game-logo', [UploadController::class, 'uploadGameLogo']);
 Route::post('/upload/game-icon', [UploadController::class, 'uploadGameIcon']);
+
+// Authenticated file deletion
+Route::middleware('auth:sanctum')->group(function () {
+    Route::delete('/upload/image', [UploadController::class, 'deleteImage']);
+});
 
 // Seasons (Public endpoints)
 Route::get('/seasons/current', [SeasonController::class, 'current']);
