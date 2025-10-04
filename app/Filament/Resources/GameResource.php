@@ -31,15 +31,13 @@ class GameResource extends Resource
                     ->label('Game Logo')
                     ->image()
                     ->disk('s3')
-                    ->directory('games/logos')
-                    ->columnSpan(2),
+                    ->directory('games/logos'),
 
                 Forms\Components\FileUpload::make('icon')
                     ->label('Game Icon')
                     ->image()
                     ->disk('s3')
-                    ->directory('games/icons')
-                    ->columnSpan(2),
+                    ->directory('games/icons'),
                 Forms\Components\TextInput::make('description')
                     ->maxLength(255),
                 Forms\Components\TextInput::make('provider_count')
