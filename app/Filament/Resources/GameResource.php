@@ -2,18 +2,15 @@
 
 namespace App\Filament\Resources;
 
+use App\Filament\Forms\Components\S3ImageUpload;
 use App\Filament\Resources\GameResource\Pages;
 use App\Filament\Resources\GameResource\RelationManagers;
 use App\Models\Game;
 use Filament\Forms;
-use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
-use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\SoftDeletingScope;
-use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
 
 class GameResource extends Resource
 {
@@ -31,16 +28,14 @@ class GameResource extends Resource
                 Forms\Components\TextInput::make('slug')
                     ->required()
                     ->maxLength(255),
-                Forms\Components\TextInput::make('logo')
-                    ->label('Game Logo Path (upload manually via API /api/upload/image)')
-                    ->helperText('Upload logo using POST /api/upload/image, then paste the returned path here')
-                    ->maxLength(255)
+                S3ImageUpload::make('logo')
+                    ->label('Game Logo')
+                    ->uploadEndpoint('/api/upload/game-logo')
                     ->columnSpan(2),
 
-                Forms\Components\TextInput::make('icon')
-                    ->label('Game Icon Path (upload manually via API /api/upload/image)')
-                    ->helperText('Upload icon using POST /api/upload/image, then paste the returned path here')
-                    ->maxLength(255)
+                S3ImageUpload::make('icon')
+                    ->label('Game Icon')
+                    ->uploadEndpoint('/api/upload/game-icon')
                     ->columnSpan(2),
                 Forms\Components\TextInput::make('description')
                     ->maxLength(255),
