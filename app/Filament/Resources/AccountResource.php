@@ -46,7 +46,6 @@ class AccountResource extends Resource
                     ->multiple()
                     ->disk('s3')
                     ->directory('products/accounts')
-                    ->visibility('public')
                     ->maxSize(2048)
                     ->required()
                     ->columnSpan(2),

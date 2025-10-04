@@ -48,7 +48,6 @@ class EventResource extends Resource
                     ->image()
                     ->disk('s3')
                     ->directory('events/banners')
-                    ->visibility('public')
                     ->maxSize(4096),
                 Forms\Components\DateTimePicker::make('starts_at')
                     ->required(),

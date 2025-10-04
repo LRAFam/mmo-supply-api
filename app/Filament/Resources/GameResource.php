@@ -35,7 +35,6 @@ class GameResource extends Resource
                     ->image()
                     ->disk('s3')
                     ->directory('games/logos')
-                    ->visibility('public')
                     ->maxSize(2048)
                     ->required()
                     ->columnSpan(2),
@@ -45,7 +44,6 @@ class GameResource extends Resource
                     ->image()
                     ->disk('s3')
                     ->directory('games/icons')
-                    ->visibility('public')
                     ->maxSize(1024)
                     ->required()
                     ->columnSpan(2),

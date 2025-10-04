@@ -45,7 +45,6 @@ class ItemResource extends Resource
                     ->image()
                     ->disk('s3')
                     ->directory('products/items')
-                    ->visibility('public')
                     ->maxSize(2048)
                     ->required()
                     ->columnSpan(2),
