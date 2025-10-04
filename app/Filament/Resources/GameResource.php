@@ -2,7 +2,6 @@
 
 namespace App\Filament\Resources;
 
-use App\Filament\Forms\Components\S3ImageUpload;
 use App\Filament\Resources\GameResource\Pages;
 use App\Filament\Resources\GameResource\RelationManagers;
 use App\Models\Game;
@@ -28,14 +27,18 @@ class GameResource extends Resource
                 Forms\Components\TextInput::make('slug')
                     ->required()
                     ->maxLength(255),
-                S3ImageUpload::make('logo')
+                Forms\Components\FileUpload::make('logo')
                     ->label('Game Logo')
-                    ->uploadEndpoint('/api/upload/game-logo')
+                    ->image()
+                    ->disk('s3')
+                    ->directory('games/logos')
                     ->columnSpan(2),
 
-                S3ImageUpload::make('icon')
+                Forms\Components\FileUpload::make('icon')
                     ->label('Game Icon')
-                    ->uploadEndpoint('/api/upload/game-icon')
+                    ->image()
+                    ->disk('s3')
+                    ->directory('games/icons')
                     ->columnSpan(2),
                 Forms\Components\TextInput::make('description')
                     ->maxLength(255),
