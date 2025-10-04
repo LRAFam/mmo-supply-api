@@ -34,27 +34,15 @@ class GameResource extends Resource
                 FileUpload::make('logo')
                     ->label('Game Logo')
                     ->image()
-                    ->maxSize(2048)
-                    ->acceptedFileTypes(['image/png', 'image/jpeg', 'image/jpg', 'image/webp'])
                     ->disk('s3')
                     ->directory('games/logos')
-                    ->getUploadedFileNameForStorageUsing(
-                        fn (TemporaryUploadedFile $file): string => (string) str($file->getClientOriginalName())
-                            ->prepend(now()->timestamp . '-'),
-                    )
                     ->columnSpan(2),
 
                 FileUpload::make('icon')
                     ->label('Game Icon')
                     ->image()
-                    ->maxSize(1024)
-                    ->acceptedFileTypes(['image/png', 'image/jpeg', 'image/jpg', 'image/webp'])
                     ->disk('s3')
                     ->directory('games/icons')
-                    ->getUploadedFileNameForStorageUsing(
-                        fn (TemporaryUploadedFile $file): string => (string) str($file->getClientOriginalName())
-                            ->prepend(now()->timestamp . '-'),
-                    )
                     ->columnSpan(2),
                 Forms\Components\TextInput::make('description')
                     ->maxLength(255),
