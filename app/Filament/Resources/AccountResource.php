@@ -2,17 +2,15 @@
 
 namespace App\Filament\Resources;
 
+use App\Filament\Forms\Components\S3ImageUpload;
 use App\Filament\Resources\AccountResource\Pages;
 use App\Filament\Resources\AccountResource\RelationManagers;
 use App\Models\Account;
 use Filament\Forms;
-use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
-use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\SoftDeletingScope;
 
 class AccountResource extends Resource
 {
@@ -40,14 +38,10 @@ class AccountResource extends Resource
                     ->maxLength(255),
                 Forms\Components\Textarea::make('content')
                     ->columnSpanFull(),
-                FileUpload::make('images')
-                    ->label('Account images')
-                    ->image()
+                S3ImageUpload::make('images')
+                    ->label('Account Images')
+                    ->uploadEndpoint('/api/upload/image')
                     ->multiple()
-                    ->disk('s3')
-                    ->directory('products/accounts')
-                    ->maxSize(2048)
-                    ->required()
                     ->columnSpan(2),
                 Forms\Components\TextInput::make('price')
                     ->required()

@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources;
 
+use App\Filament\Forms\Components\S3ImageUpload;
 use App\Filament\Resources\EventResource\Pages;
 use App\Filament\Resources\EventResource\RelationManagers;
 use App\Models\Event;
@@ -10,8 +11,6 @@ use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
-use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\SoftDeletingScope;
 
 class EventResource extends Resource
 {
@@ -44,11 +43,9 @@ class EventResource extends Resource
                 Forms\Components\Select::make('game_id')
                     ->relationship('game', 'name')
                     ->searchable(),
-                Forms\Components\FileUpload::make('banner_image')
-                    ->image()
-                    ->disk('s3')
-                    ->directory('events/banners')
-                    ->maxSize(4096),
+                S3ImageUpload::make('banner_image')
+                    ->label('Banner Image')
+                    ->uploadEndpoint('/api/upload/image'),
                 Forms\Components\DateTimePicker::make('starts_at')
                     ->required(),
                 Forms\Components\DateTimePicker::make('ends_at')

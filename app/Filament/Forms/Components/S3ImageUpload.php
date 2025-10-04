@@ -10,6 +10,8 @@ class S3ImageUpload extends Field
 
     protected string $uploadEndpoint = '/api/upload/image';
 
+    protected bool $multiple = false;
+
     public function uploadEndpoint(string $endpoint): static
     {
         $this->uploadEndpoint = $endpoint;
@@ -20,5 +22,17 @@ class S3ImageUpload extends Field
     public function getUploadEndpoint(): string
     {
         return $this->uploadEndpoint;
+    }
+
+    public function multiple(bool $multiple = true): static
+    {
+        $this->multiple = $multiple;
+
+        return $this;
+    }
+
+    public function isMultiple(): bool
+    {
+        return $this->multiple;
     }
 }

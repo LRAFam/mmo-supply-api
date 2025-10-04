@@ -2,17 +2,15 @@
 
 namespace App\Filament\Resources;
 
+use App\Filament\Forms\Components\S3ImageUpload;
 use App\Filament\Resources\ServiceResource\Pages;
 use App\Filament\Resources\ServiceResource\RelationManagers;
 use App\Models\Service;
 use Filament\Forms;
-use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
-use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\SoftDeletingScope;
 
 class ServiceResource extends Resource
 {
@@ -39,14 +37,10 @@ class ServiceResource extends Resource
                 Forms\Components\Textarea::make('content')
                     ->required()
                     ->columnSpanFull(),
-                FileUpload::make('images')
-                    ->label('Service images')
-                    ->image()
+                S3ImageUpload::make('images')
+                    ->label('Service Images')
+                    ->uploadEndpoint('/api/upload/image')
                     ->multiple()
-                    ->disk('s3')
-                    ->directory('products/services')
-                    ->maxSize(2048)
-                    ->required()
                     ->columnSpan(2),
                 Forms\Components\TextInput::make('price')
                     ->required()
