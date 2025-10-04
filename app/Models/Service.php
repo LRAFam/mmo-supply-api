@@ -40,8 +40,8 @@ class Service extends Model
     protected function imagesUrls(): Attribute
     {
         return Attribute::make(
-            get: fn () => $this->images
-                ? array_map(fn($img) => Storage::disk('s3')->url($img), $this->images)
+            get: fn () => is_array($this->images) && !empty($this->images)
+                ? array_map(fn($img) => Storage::disk('s3')->temporaryUrl($img, now()->addHours(24)), $this->images)
                 : [],
         );
     }
