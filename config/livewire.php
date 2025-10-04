@@ -64,7 +64,7 @@ return [
     */
 
     'temporary_file_upload' => [
-        'disk' => 'public',    // Use 'public' disk for temp uploads (works in production)
+        'disk' => 's3',        // Use S3 for temp uploads so Filament can move files within same disk
         'rules' => null,       // Example: ['file', 'mimes:png,jpg']  | Default: ['required', 'file', 'max:12288'] (12MB)
         'directory' => 'livewire-tmp',   // Temporary upload directory
         'middleware' => null,  // Example: 'throttle:5,1'             | Default: 'throttle:60,1'
