@@ -16,6 +16,7 @@ use App\Http\Controllers\MessageController;
 use App\Http\Controllers\OrderController;
 use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\ProviderController;
+use App\Http\Controllers\ReferralController;
 use App\Http\Controllers\ReviewController;
 use App\Http\Controllers\SeasonController;
 use App\Http\Controllers\SellerSubscriptionController;
@@ -148,6 +149,12 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/spin-wheels/{wheelId}', [SpinWheelController::class, 'show']);
     Route::post('/spin-wheels/{wheelId}/spin', [SpinWheelController::class, 'spin']);
 
+    // Referral System
+    Route::get('/referrals/stats', [ReferralController::class, 'getStats']);
+    Route::get('/referrals/list', [ReferralController::class, 'getReferrals']);
+    Route::get('/referrals/earnings', [ReferralController::class, 'getEarnings']);
+    Route::post('/referrals/apply', [ReferralController::class, 'applyReferralCode']);
+
 });
 
 // Image uploads (accessible without Sanctum auth for Filament admin)
@@ -172,6 +179,10 @@ Route::get('/users/{userId}/seasons', [SeasonController::class, 'userSeasons']);
 // Public featured listings endpoints
 Route::get('/featured-listings/pricing', [FeaturedListingController::class, 'getPricing']);
 Route::get('/featured-listings/active', [FeaturedListingController::class, 'getActive']);
+
+// Public referral endpoints
+Route::post('/referrals/validate', [ReferralController::class, 'validateCode']);
+Route::get('/referrals/leaderboard', [ReferralController::class, 'getLeaderboard']);
 
 // Admin routes (TODO: Add admin middleware)
 Route::middleware('auth:sanctum')->prefix('admin')->group(function () {

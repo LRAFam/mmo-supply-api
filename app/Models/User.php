@@ -40,6 +40,10 @@ class User extends Authenticatable implements FilamentUser
         'lifetime_sales',
         'monthly_sales_reset_at',
         'auto_tier',
+        'referral_code',
+        'referred_by',
+        'total_referral_earnings',
+        'total_referrals',
     ];
 
     /**
@@ -294,9 +298,16 @@ class User extends Authenticatable implements FilamentUser
 
         // Update if changed
         if ($this->auto_tier !== $newTier) {
+            // Map auto_tier values to seller_tier values
+            $sellerTierMapping = [
+                'standard' => 'standard',
+                'verified' => 'partner',
+                'premium' => 'elite',
+            ];
+
             $this->update([
                 'auto_tier' => $newTier,
-                'seller_tier' => $newTier,
+                'seller_tier' => $sellerTierMapping[$newTier],
             ]);
         }
     }
@@ -435,5 +446,63 @@ class User extends Authenticatable implements FilamentUser
     public function isModerator(): bool
     {
         return $this->role === 'moderator';
+    }
+
+    /**
+     * Get the user who referred this user
+     */
+    public function referrer()
+    {
+        return $this->belongsTo(User::class, 'referred_by');
+    }
+
+    /**
+     * Get all users referred by this user
+     */
+    public function referrals()
+    {
+        return $this->hasMany(User::class, 'referred_by');
+    }
+
+    /**
+     * Get all referral relationships where this user is the referrer
+     */
+    public function referralRelationships()
+    {
+        return $this->hasMany(Referral::class, 'referrer_id');
+    }
+
+    /**
+     * Get all referral earnings for this user
+     */
+    public function referralEarnings()
+    {
+        return $this->hasMany(ReferralEarning::class, 'referrer_id');
+    }
+
+    /**
+     * Generate a unique referral code for this user
+     */
+    public function generateReferralCode(): string
+    {
+        do {
+            $code = strtoupper(substr(md5($this->id . time() . rand()), 0, 8));
+        } while (User::where('referral_code', $code)->exists());
+
+        $this->update(['referral_code' => $code]);
+
+        return $code;
+    }
+
+    /**
+     * Get or generate referral code
+     */
+    public function getReferralCode(): string
+    {
+        if (!$this->referral_code) {
+            return $this->generateReferralCode();
+        }
+
+        return $this->referral_code;
     }
 }

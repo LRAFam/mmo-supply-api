@@ -276,6 +276,18 @@ class OrderController extends Controller
             if ($allDelivered) {
                 $order->status = 'delivered';
                 $order->save();
+
+                // Process referral commission if buyer was referred
+                $buyer = $order->buyer;
+                if ($buyer->referred_by) {
+                    $referral = \App\Models\Referral::where('referrer_id', $buyer->referred_by)
+                        ->where('referred_id', $buyer->id)
+                        ->first();
+
+                    if ($referral) {
+                        $referral->recordPurchase($order);
+                    }
+                }
             }
 
             // Send email notification to buyer

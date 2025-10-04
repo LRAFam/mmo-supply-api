@@ -77,39 +77,74 @@ class AuthController extends Controller
             'name' => 'required|string|max:20',
             'email' => 'required|string|email|max:255|unique:users',
             'password' => 'required|string|min:8|confirmed',
+            'referral_code' => 'nullable|string|exists:users,referral_code',
         ]);
 
-        $user = User::create([
-            'name' => $request->name,
-            'email' => $request->email,
-            'password' => bcrypt($request->password),
-        ]);
+        DB::beginTransaction();
 
-        // Create wallet for new user
-        $user->wallet()->create(['balance' => 0]);
+        try {
+            $user = User::create([
+                'name' => $request->name,
+                'email' => $request->email,
+                'password' => bcrypt($request->password),
+            ]);
 
-        // Send verification email
-        $this->sendVerificationEmail($user);
+            // Create wallet for new user
+            $user->wallet()->create(['balance' => 0]);
 
-        $token = $user->createToken('auth_token')->plainTextToken;
+            // Handle referral code if provided
+            if ($request->referral_code) {
+                $referrer = User::where('referral_code', $request->referral_code)->first();
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Registration successful! Please check your email to verify your account.',
-            'user' => [
-                'id' => $user->id,
-                'name' => $user->name,
-                'email' => $user->email,
-                'email_verified_at' => $user->email_verified_at,
-                'created_at' => $user->created_at,
-                'is_seller' => $user->is_seller ?? false,
-                'subscription_tier' => $user->getSubscriptionTier(),
-                'wallet' => [
-                    'balance' => 0,
+                if ($referrer && $referrer->id !== $user->id) {
+                    // Update user's referred_by
+                    $user->update(['referred_by' => $referrer->id]);
+
+                    // Create referral record
+                    \App\Models\Referral::create([
+                        'referrer_id' => $referrer->id,
+                        'referred_id' => $user->id,
+                        'referral_code' => $referrer->referral_code,
+                    ]);
+
+                    // Increment referrer's total referrals count
+                    $referrer->increment('total_referrals');
+                }
+            }
+
+            // Send verification email
+            $this->sendVerificationEmail($user);
+
+            $token = $user->createToken('auth_token')->plainTextToken;
+
+            DB::commit();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Registration successful! Please check your email to verify your account.',
+                'user' => [
+                    'id' => $user->id,
+                    'name' => $user->name,
+                    'email' => $user->email,
+                    'email_verified_at' => $user->email_verified_at,
+                    'created_at' => $user->created_at,
+                    'is_seller' => $user->is_seller ?? false,
+                    'subscription_tier' => $user->getSubscriptionTier(),
+                    'wallet' => [
+                        'balance' => 0,
+                    ],
                 ],
-            ],
-            'token' => $token,
-        ], 201);
+                'token' => $token,
+            ], 201);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('Registration error: ' . $e->getMessage());
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Registration failed. Please try again.',
+            ], 500);
+        }
     }
 
     /**
