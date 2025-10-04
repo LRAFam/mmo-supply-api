@@ -14,7 +14,7 @@ class UploadController extends Controller
     public function uploadImage(Request $request)
     {
         $request->validate([
-            'image' => 'required|image|mimes:jpeg,png,jpg,gif,webp,avif|max:10240', // 10MB max
+            'image' => 'required|file|mimes:jpeg,png,jpg,gif,webp,avif|mimetypes:image/jpeg,image/png,image/gif,image/webp,image/avif|max:10240', // 10MB max
         ]);
 
         try {
@@ -54,7 +54,7 @@ class UploadController extends Controller
     {
         $request->validate([
             'images' => 'required|array|max:5',
-            'images.*' => 'image|mimes:jpeg,png,jpg,gif,webp,avif|max:10240',
+            'images.*' => 'file|mimes:jpeg,png,jpg,gif,webp,avif|mimetypes:image/jpeg,image/png,image/gif,image/webp,image/avif|max:10240',
         ]);
 
         try {
@@ -94,7 +94,7 @@ class UploadController extends Controller
     public function uploadGameLogo(Request $request)
     {
         $request->validate([
-            'image' => 'required|image|mimes:jpeg,png,jpg,webp,avif|max:2048',
+            'image' => 'required|file|mimes:jpeg,png,jpg,webp,avif|mimetypes:image/jpeg,image/png,image/webp,image/avif|max:2048',
         ]);
 
         try {
@@ -129,7 +129,7 @@ class UploadController extends Controller
     public function uploadGameIcon(Request $request)
     {
         $request->validate([
-            'image' => 'required|image|mimes:jpeg,png,jpg,webp,avif|max:1024',
+            'image' => 'required|file|mimes:jpeg,png,jpg,webp,avif|mimetypes:image/jpeg,image/png,image/webp,image/avif|max:1024',
         ]);
 
         try {

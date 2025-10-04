@@ -4,11 +4,9 @@ namespace App\Providers;
 
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Support\Facades\Event;
-use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\ServiceProvider;
 use SocialiteProviders\Discord\Provider;
 use SocialiteProviders\Manager\SocialiteWasCalled;
-use Symfony\Component\Mime\MimeTypes;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -25,10 +23,6 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        // Register AVIF MIME type support
-        $mimeTypes = MimeTypes::getDefault();
-        $mimeTypes->registerGuesserExtension('avif', 'image/avif');
-
         // Define polymorphic morph map for order items and subscriptions
         Relation::enforceMorphMap([
             'user' => \App\Models\User::class,
