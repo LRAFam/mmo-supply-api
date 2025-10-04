@@ -13,6 +13,7 @@ use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
+use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
 
 class GameResource extends Resource
 {
@@ -33,19 +34,27 @@ class GameResource extends Resource
                 FileUpload::make('logo')
                     ->label('Game Logo')
                     ->image()
-                    ->disk('s3')
-                    ->directory('games/logos')
                     ->maxSize(2048)
                     ->acceptedFileTypes(['image/png', 'image/jpeg', 'image/jpg', 'image/webp'])
+                    ->disk('s3')
+                    ->directory('games/logos')
+                    ->getUploadedFileNameForStorageUsing(
+                        fn (TemporaryUploadedFile $file): string => (string) str($file->getClientOriginalName())
+                            ->prepend(now()->timestamp . '-'),
+                    )
                     ->columnSpan(2),
 
                 FileUpload::make('icon')
                     ->label('Game Icon')
                     ->image()
-                    ->disk('s3')
-                    ->directory('games/icons')
                     ->maxSize(1024)
                     ->acceptedFileTypes(['image/png', 'image/jpeg', 'image/jpg', 'image/webp'])
+                    ->disk('s3')
+                    ->directory('games/icons')
+                    ->getUploadedFileNameForStorageUsing(
+                        fn (TemporaryUploadedFile $file): string => (string) str($file->getClientOriginalName())
+                            ->prepend(now()->timestamp . '-'),
+                    )
                     ->columnSpan(2),
                 Forms\Components\TextInput::make('description')
                     ->maxLength(255),
