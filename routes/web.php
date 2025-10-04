@@ -130,3 +130,34 @@ Route::get('/debug/filament-upload', function () {
         ], 500, [], JSON_PRETTY_PRINT);
     }
 });
+
+// Check actual games in database
+Route::get('/debug/games', function () {
+    try {
+        $games = \App\Models\Game::latest()->take(10)->get();
+
+        $result = [
+            'total_games' => \App\Models\Game::count(),
+            'games' => $games->map(function($game) {
+                return [
+                    'id' => $game->id,
+                    'title' => $game->title,
+                    'logo' => $game->logo,
+                    'icon' => $game->icon,
+                    'logo_url' => $game->logo_url,
+                    'icon_url' => $game->icon_url,
+                    'created_at' => $game->created_at,
+                ];
+            }),
+            'all_s3_files' => Storage::disk('s3')->allFiles(),
+        ];
+
+        return response()->json($result, 200, [], JSON_PRETTY_PRINT);
+
+    } catch (\Exception $e) {
+        return response()->json([
+            'error' => $e->getMessage(),
+            'trace' => $e->getTraceAsString(),
+        ], 500, [], JSON_PRETTY_PRINT);
+    }
+});
