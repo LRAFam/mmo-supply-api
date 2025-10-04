@@ -134,7 +134,7 @@ Route::get('/debug/filament-upload', function () {
 // Check actual games in database
 Route::get('/debug/games', function () {
     try {
-        $games = \App\Models\Game::latest()->take(10)->get();
+        $games = \App\Models\Game::latest()->get();
 
         $result = [
             'total_games' => \App\Models\Game::count(),
