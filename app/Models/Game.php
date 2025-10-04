@@ -29,22 +29,22 @@ class Game extends Model
     protected $appends = ['logo_url', 'icon_url'];
 
     /**
-     * Get the full URL for the logo
+     * Get the full URL for the logo (using signed URL for 24 hours)
      */
     protected function logoUrl(): Attribute
     {
         return Attribute::make(
-            get: fn () => $this->logo ? Storage::disk('s3')->url($this->logo) : null,
+            get: fn () => $this->logo ? Storage::disk('s3')->temporaryUrl($this->logo, now()->addHours(24)) : null,
         );
     }
 
     /**
-     * Get the full URL for the icon
+     * Get the full URL for the icon (using signed URL for 24 hours)
      */
     protected function iconUrl(): Attribute
     {
         return Attribute::make(
-            get: fn () => $this->icon ? Storage::disk('s3')->url($this->icon) : null,
+            get: fn () => $this->icon ? Storage::disk('s3')->temporaryUrl($this->icon, now()->addHours(24)) : null,
         );
     }
 
