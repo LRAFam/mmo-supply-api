@@ -23,6 +23,9 @@ class EditGame extends EditRecord
         // When updating logo/icon, delete old files from S3
         $record = $this->getRecord();
 
+        // Debug logging
+        \Log::info('Game save data:', $data);
+
         if (isset($data['logo']) && $data['logo'] !== $record->logo && $record->logo) {
             Storage::disk('s3')->delete($record->logo);
         }
