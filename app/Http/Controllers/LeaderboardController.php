@@ -137,26 +137,40 @@ class LeaderboardController extends Controller
 
     /**
      * Get reward structure for period
+     * Scales with platform revenue (2% of platform fees for the period)
      */
     private function getRewardStructure(string $period): array
     {
+        // Calculate platform revenue for the current period
+        $dates = $this->getPeriodDates($period);
+
+        // Get total platform fees collected during this period
+        $platformRevenue = \DB::table('orders')
+            ->where('payment_status', 'completed')
+            ->whereBetween('created_at', [$dates['start'], $dates['end']])
+            ->sum(\DB::raw('platform_fee'));
+
+        // Allocate 2% of platform revenue to prize pool (or minimum base amount)
+        $prizePool = max($platformRevenue * 0.02, $period === 'weekly' ? 10 : 50);
+
         if ($period === 'weekly') {
+            // Weekly distribution: 50%, 25%, 10%, 15% for ranks 4-10
             return [
-                ['rank_start' => 1, 'rank_end' => 1, 'amount' => 5.00, 'badge' => 'gold', 'label' => '1st Place'],
-                ['rank_start' => 2, 'rank_end' => 2, 'amount' => 2.50, 'badge' => 'silver', 'label' => '2nd Place'],
-                ['rank_start' => 3, 'rank_end' => 3, 'amount' => 1.00, 'badge' => 'bronze', 'label' => '3rd Place'],
-                ['rank_start' => 4, 'rank_end' => 10, 'amount' => 0.50, 'badge' => null, 'label' => 'Top 10'],
+                ['rank_start' => 1, 'rank_end' => 1, 'amount' => round($prizePool * 0.50, 2), 'badge' => 'gold', 'label' => '1st Place'],
+                ['rank_start' => 2, 'rank_end' => 2, 'amount' => round($prizePool * 0.25, 2), 'badge' => 'silver', 'label' => '2nd Place'],
+                ['rank_start' => 3, 'rank_end' => 3, 'amount' => round($prizePool * 0.10, 2), 'badge' => 'bronze', 'label' => '3rd Place'],
+                ['rank_start' => 4, 'rank_end' => 10, 'amount' => round(($prizePool * 0.15) / 7, 2), 'badge' => null, 'label' => 'Top 10'],
             ];
         }
 
-        // Monthly rewards (bigger prizes)
+        // Monthly distribution: 35%, 20%, 12%, 10% (top 5), 13% (6-10), 10% (11-20)
         return [
-            ['rank_start' => 1, 'rank_end' => 1, 'amount' => 25.00, 'badge' => 'gold', 'label' => '1st Place'],
-            ['rank_start' => 2, 'rank_end' => 2, 'amount' => 15.00, 'badge' => 'silver', 'label' => '2nd Place'],
-            ['rank_start' => 3, 'rank_end' => 3, 'amount' => 7.50, 'badge' => 'bronze', 'label' => '3rd Place'],
-            ['rank_start' => 4, 'rank_end' => 5, 'amount' => 3.00, 'badge' => null, 'label' => 'Top 5'],
-            ['rank_start' => 6, 'rank_end' => 10, 'amount' => 2.00, 'badge' => null, 'label' => 'Top 10'],
-            ['rank_start' => 11, 'rank_end' => 20, 'amount' => 1.00, 'badge' => null, 'label' => 'Top 20'],
+            ['rank_start' => 1, 'rank_end' => 1, 'amount' => round($prizePool * 0.35, 2), 'badge' => 'gold', 'label' => '1st Place'],
+            ['rank_start' => 2, 'rank_end' => 2, 'amount' => round($prizePool * 0.20, 2), 'badge' => 'silver', 'label' => '2nd Place'],
+            ['rank_start' => 3, 'rank_end' => 3, 'amount' => round($prizePool * 0.12, 2), 'badge' => 'bronze', 'label' => '3rd Place'],
+            ['rank_start' => 4, 'rank_end' => 5, 'amount' => round(($prizePool * 0.10) / 2, 2), 'badge' => null, 'label' => 'Top 5'],
+            ['rank_start' => 6, 'rank_end' => 10, 'amount' => round(($prizePool * 0.13) / 5, 2), 'badge' => null, 'label' => 'Top 10'],
+            ['rank_start' => 11, 'rank_end' => 20, 'amount' => round(($prizePool * 0.10) / 10, 2), 'badge' => null, 'label' => 'Top 20'],
         ];
     }
 
