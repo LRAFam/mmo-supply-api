@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Game Image Upload - MMO.Supply</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 p-8">
+    <div class="max-w-2xl mx-auto bg-white rounded-lg shadow-lg p-8">
+        <h1 class="text-3xl font-bold mb-6">Game Image Upload</h1>
+
+        <!-- Logo Upload -->
+        <div class="mb-8">
+            <h2 class="text-xl font-semibold mb-4">Upload Logo</h2>
+            <input type="file" id="logoInput" accept="image/png,image/jpeg,image/jpg,image/webp"
+                   class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-amber-50 file:text-amber-700 hover:file:bg-amber-100 mb-4">
+            <button onclick="uploadLogo()"
+                    class="bg-amber-600 hover:bg-amber-700 text-white font-bold py-2 px-4 rounded">
+                Upload Logo
+            </button>
+            <div id="logoResult" class="mt-4"></div>
+        </div>
+
+        <!-- Icon Upload -->
+        <div class="mb-8">
+            <h2 class="text-xl font-semibold mb-4">Upload Icon</h2>
+            <input type="file" id="iconInput" accept="image/png,image/jpeg,image/jpg,image/webp"
+                   class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-amber-50 file:text-amber-700 hover:file:bg-amber-100 mb-4">
+            <button onclick="uploadIcon()"
+                    class="bg-amber-600 hover:bg-amber-700 text-white font-bold py-2 px-4 rounded">
+                Upload Icon
+            </button>
+            <div id="iconResult" class="mt-4"></div>
+        </div>
+    </div>
+
+    <script>
+        async function uploadLogo() {
+            const input = document.getElementById('logoInput');
+            const resultDiv = document.getElementById('logoResult');
+
+            if (!input.files[0]) {
+                resultDiv.innerHTML = '<p class="text-red-600">Please select a file first</p>';
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('image', input.files[0]);
+
+            try {
+                resultDiv.innerHTML = '<p class="text-blue-600">Uploading...</p>';
+
+                const response = await fetch('/api/upload/game-logo', {
+                    method: 'POST',
+                    body: formData,
+                    headers: {
+                        'Accept': 'application/json',
+                    }
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    resultDiv.innerHTML = `
+                        <div class="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded">
+                            <p class="font-bold">Success!</p>
+                            <p class="mt-2"><strong>Path:</strong> <code class="bg-gray-100 px-2 py-1 rounded">${data.path}</code></p>
+                            <p class="mt-2"><strong>URL:</strong> <a href="${data.url}" target="_blank" class="text-blue-600 underline">${data.url}</a></p>
+                            <img src="${data.url}" alt="Uploaded logo" class="mt-4 max-w-xs border rounded">
+                        </div>
+                    `;
+                } else {
+                    resultDiv.innerHTML = `<p class="text-red-600">Error: ${data.error}</p>`;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<p class="text-red-600">Error: ${error.message}</p>`;
+            }
+        }
+
+        async function uploadIcon() {
+            const input = document.getElementById('iconInput');
+            const resultDiv = document.getElementById('iconResult');
+
+            if (!input.files[0]) {
+                resultDiv.innerHTML = '<p class="text-red-600">Please select a file first</p>';
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('image', input.files[0]);
+
+            try {
+                resultDiv.innerHTML = '<p class="text-blue-600">Uploading...</p>';
+
+                const response = await fetch('/api/upload/game-icon', {
+                    method: 'POST',
+                    body: formData,
+                    headers: {
+                        'Accept': 'application/json',
+                    }
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    resultDiv.innerHTML = `
+                        <div class="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded">
+                            <p class="font-bold">Success!</p>
+                            <p class="mt-2"><strong>Path:</strong> <code class="bg-gray-100 px-2 py-1 rounded">${data.path}</code></p>
+                            <p class="mt-2"><strong>URL:</strong> <a href="${data.url}" target="_blank" class="text-blue-600 underline">${data.url}</a></p>
+                            <img src="${data.url}" alt="Uploaded icon" class="mt-4 max-w-xs border rounded">
+                        </div>
+                    `;
+                } else {
+                    resultDiv.innerHTML = `<p class="text-red-600">Error: ${data.error}</p>`;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<p class="text-red-600">Error: ${error.message}</p>`;
+            }
+        }
+    </script>
+</body>
+</html>

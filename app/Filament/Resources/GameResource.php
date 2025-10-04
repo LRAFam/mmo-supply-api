@@ -31,18 +31,16 @@ class GameResource extends Resource
                 Forms\Components\TextInput::make('slug')
                     ->required()
                     ->maxLength(255),
-                FileUpload::make('logo')
-                    ->label('Game Logo')
-                    ->image()
-                    ->disk('s3')
-                    ->directory('games/logos')
+                Forms\Components\TextInput::make('logo')
+                    ->label('Game Logo Path (upload manually via API /api/upload/image)')
+                    ->helperText('Upload logo using POST /api/upload/image, then paste the returned path here')
+                    ->maxLength(255)
                     ->columnSpan(2),
 
-                FileUpload::make('icon')
-                    ->label('Game Icon')
-                    ->image()
-                    ->disk('s3')
-                    ->directory('games/icons')
+                Forms\Components\TextInput::make('icon')
+                    ->label('Game Icon Path (upload manually via API /api/upload/image)')
+                    ->helperText('Upload icon using POST /api/upload/image, then paste the returned path here')
+                    ->maxLength(255)
                     ->columnSpan(2),
                 Forms\Components\TextInput::make('description')
                     ->maxLength(255),
