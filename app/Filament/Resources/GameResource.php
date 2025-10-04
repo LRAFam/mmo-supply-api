@@ -37,6 +37,7 @@ class GameResource extends Resource
                     ->directory('games/logos')
                     ->maxSize(2048)
                     ->required()
+                    ->acceptedFileTypes(['image/png', 'image/jpeg', 'image/jpg', 'image/webp'])
                     ->columnSpan(2),
 
                 FileUpload::make('icon')
@@ -46,6 +47,7 @@ class GameResource extends Resource
                     ->directory('games/icons')
                     ->maxSize(1024)
                     ->required()
+                    ->acceptedFileTypes(['image/png', 'image/jpeg', 'image/jpg', 'image/webp'])
                     ->columnSpan(2),
                 Forms\Components\TextInput::make('description')
                     ->maxLength(255),
