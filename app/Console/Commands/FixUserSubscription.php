@@ -81,9 +81,33 @@ class FixUserSubscription extends Command
                 $this->info("Using existing Stripe customer: {$user->stripe_id}");
             }
 
+            // Try to find and attach an existing payment method
+            $this->info('Looking for existing payment methods...');
+            $paymentMethods = \Stripe\PaymentMethod::all([
+                'customer' => $user->stripe_id,
+                'type' => 'card',
+            ]);
+
+            $defaultPaymentMethod = null;
+            if (!empty($paymentMethods->data)) {
+                $defaultPaymentMethod = $paymentMethods->data[0]->id;
+                $this->info("Found payment method: {$defaultPaymentMethod}");
+
+                // Set as default payment method
+                \Stripe\Customer::update($user->stripe_id, [
+                    'invoice_settings' => [
+                        'default_payment_method' => $defaultPaymentMethod,
+                    ],
+                ]);
+                $this->info('Set as default payment method');
+            } else {
+                $this->warn('No payment method found. Creating subscription without immediate charge...');
+                $this->warn('User will need to add payment method through billing portal.');
+            }
+
             // Create subscription in Stripe
             $this->info('Creating subscription in Stripe...');
-            $stripeSubscription = StripeSubscription::create([
+            $subscriptionData = [
                 'customer' => $user->stripe_id,
                 'items' => [
                     ['price' => $priceId],
@@ -92,7 +116,18 @@ class FixUserSubscription extends Command
                     'user_id' => $user->id,
                     'tier' => $tier,
                 ],
-            ]);
+            ];
+
+            // If no payment method, create with trial or payment pending
+            if (!$defaultPaymentMethod) {
+                $subscriptionData['payment_behavior'] = 'default_incomplete';
+                $subscriptionData['payment_settings'] = [
+                    'payment_method_types' => ['card'],
+                    'save_default_payment_method' => 'on_subscription',
+                ];
+            }
+
+            $stripeSubscription = StripeSubscription::create($subscriptionData);
 
             $this->info("Stripe subscription created: {$stripeSubscription->id}");
 
