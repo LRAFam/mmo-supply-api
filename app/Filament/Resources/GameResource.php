@@ -3,7 +3,6 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Resources\GameResource\Pages;
-use App\Filament\Resources\GameResource\RelationManagers;
 use App\Models\Game;
 use Filament\Forms;
 use Filament\Forms\Form;
@@ -31,13 +30,19 @@ class GameResource extends Resource
                     ->label('Game Logo')
                     ->image()
                     ->disk('s3')
-                    ->directory('games/logos'),
+                    ->directory('games/logos')
+                    ->visibility('public')
+                    ->acceptedFileTypes(['image/jpeg', 'image/png', 'image/webp', 'image/avif'])
+                    ->maxSize(2048),
 
                 Forms\Components\FileUpload::make('icon')
                     ->label('Game Icon')
                     ->image()
                     ->disk('s3')
-                    ->directory('games/icons'),
+                    ->directory('games/icons')
+                    ->visibility('public')
+                    ->acceptedFileTypes(['image/jpeg', 'image/png', 'image/webp', 'image/avif'])
+                    ->maxSize(1024),
                 Forms\Components\TextInput::make('description')
                     ->maxLength(255),
                 Forms\Components\TextInput::make('provider_count')
