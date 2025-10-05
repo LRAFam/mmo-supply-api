@@ -161,34 +161,48 @@ class SellerSubscriptionController extends Controller
                     'is_active' => false, // Will be activated by webhook
                 ]);
 
-                // Create payment intent with metadata
+                // Create Stripe Checkout Session for subscription
                 $stripeService = new StripePaymentService();
-                $paymentIntent = \Stripe\PaymentIntent::create([
-                    'amount' => (int)($price * 100),
-                    'currency' => 'usd',
+                \Stripe\Stripe::setApiKey(config('services.stripe.secret'));
+
+                $checkoutSession = \Stripe\Checkout\Session::create([
                     'customer' => $stripeService->getOrCreateCustomer($user),
+                    'payment_method_types' => ['card'],
+                    'line_items' => [[
+                        'price_data' => [
+                            'currency' => 'usd',
+                            'product_data' => [
+                                'name' => ucfirst($tier) . ' Seller Subscription',
+                                'description' => 'Monthly subscription with ' . $creatorEarnings . '% creator earnings',
+                            ],
+                            'unit_amount' => (int)($price * 100),
+                            'recurring' => [
+                                'interval' => 'month',
+                            ],
+                        ],
+                        'quantity' => 1,
+                    ]],
+                    'mode' => 'subscription',
+                    'success_url' => config('app.frontend_url', 'http://localhost:3000') . '/provider/subscription?session_id={CHECKOUT_SESSION_ID}',
+                    'cancel_url' => config('app.frontend_url', 'http://localhost:3000') . '/provider/subscription',
                     'metadata' => [
                         'user_id' => $user->id,
                         'type' => 'seller_subscription',
                         'tier' => $tier,
                         'subscription_id' => $subscription->id,
                     ],
-                    'automatic_payment_methods' => [
-                        'enabled' => true,
-                    ],
                 ]);
 
-                // Update subscription with payment intent ID
-                $subscription->update(['stripe_subscription_id' => $paymentIntent->id]);
+                // Store checkout session ID
+                $subscription->update(['stripe_subscription_id' => $checkoutSession->id]);
 
                 DB::commit();
 
                 return response()->json([
-                    'message' => 'Subscription created, payment required',
+                    'message' => 'Checkout session created',
                     'subscription' => $subscription,
                     'requires_payment' => true,
-                    'payment_intent_id' => $paymentIntent->id,
-                    'payment_intent_client_secret' => $paymentIntent->client_secret,
+                    'checkout_url' => $checkoutSession->url,
                 ], 201);
             }
 
