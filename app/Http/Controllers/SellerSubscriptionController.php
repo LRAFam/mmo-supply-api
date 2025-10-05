@@ -172,8 +172,8 @@ class SellerSubscriptionController extends Controller
                         'price_data' => [
                             'currency' => 'usd',
                             'product_data' => [
-                                'name' => ucfirst($tier) . ' Seller Subscription',
-                                'description' => 'Monthly subscription with ' . $creatorEarnings . '% creator earnings',
+                                'name' => ucfirst($tier) . ' Membership',
+                                'description' => 'Monthly premium membership for MMO Supply',
                             ],
                             'unit_amount' => (int)($price * 100),
                             'recurring' => [
