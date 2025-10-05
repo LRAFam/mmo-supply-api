@@ -79,4 +79,30 @@ class UserController extends Controller
             ],
         ]);
     }
+
+    /**
+     * Show public user profile (no authentication required)
+     */
+    public function showPublic($username)
+    {
+        $user = User::where('name', $username)->first();
+
+        if (!$user) {
+            return response()->json(['error' => 'User not found'], 404);
+        }
+
+        return response()->json([
+            'id' => $user->id,
+            'name' => $user->name,
+            'avatar' => $user->avatar,
+            'bio' => $user->bio,
+            'role' => $user->role,
+            'is_seller' => (bool) $user->is_seller,
+            'seller_tier' => $user->seller_tier,
+            'lifetime_sales' => $user->lifetime_sales ?? 0,
+            'monthly_sales' => $user->monthly_sales ?? 0,
+            'total_referrals' => $user->total_referrals ?? 0,
+            'created_at' => $user->created_at,
+        ]);
+    }
 }

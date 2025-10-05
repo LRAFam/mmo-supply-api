@@ -38,7 +38,26 @@ class StripeWebhookController extends Controller
 
         Log::info('Stripe webhook received', ['type' => $event->type]);
 
-        // Handle the event
+        // Cashier subscription events - delegate to Cashier's webhook handler
+        $cashierEvents = [
+            'checkout.session.completed',
+            'customer.subscription.created',
+            'customer.subscription.updated',
+            'customer.subscription.deleted',
+            'customer.updated',
+            'customer.deleted',
+            'invoice.payment_action_required',
+            'invoice.payment_succeeded',
+            'invoice.payment_failed',
+        ];
+
+        if (in_array($event->type, $cashierEvents)) {
+            Log::info('Delegating to Cashier webhook handler', ['type' => $event->type]);
+            $cashierController = new \Laravel\Cashier\Http\Controllers\WebhookController();
+            return $cashierController->handleWebhook($request);
+        }
+
+        // Handle custom payment events
         switch ($event->type) {
             case 'payment_intent.succeeded':
                 $this->handlePaymentIntentSucceeded($event->data->object);
