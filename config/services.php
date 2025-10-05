@@ -59,7 +59,3 @@ return [
     ],
 
 ];
-
-    'nowpayments' => [
-        'api_key' => env('NOWPAYMENTS_API_KEY'),
-    ],
