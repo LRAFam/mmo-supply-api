@@ -94,10 +94,20 @@ class SubscriptionController extends Controller
 
             $intent = $user->createSetupIntent();
 
+            \Log::info('Setup intent created', [
+                'intent_id' => $intent->id,
+                'user_id' => $user->id,
+                'stripe_customer_id' => $user->stripe_id,
+            ]);
+
             return response()->json([
                 'client_secret' => $intent->client_secret,
             ]);
         } catch (\Exception $e) {
+            \Log::error('Setup intent creation failed', [
+                'error' => $e->getMessage(),
+                'user_id' => $user->id,
+            ]);
             return response()->json([
                 'error' => 'Failed to create setup intent: ' . $e->getMessage()
             ], 500);
