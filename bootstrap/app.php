@@ -34,6 +34,11 @@ return Application::configure(basePath: dirname(__DIR__))
             ThrottleRequests::class,
         ]);
 
+        // Register custom middleware aliases
+        $middleware->alias([
+            'discord.bot' => \App\Http\Middleware\DiscordBotAuth::class,
+        ]);
+
         // Return JSON error for unauthenticated API requests instead of redirect
         $middleware->redirectGuestsTo(fn () => abort(401, 'Unauthenticated'));
 

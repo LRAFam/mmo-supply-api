@@ -7,6 +7,7 @@ use App\Http\Controllers\AdvertisementController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\CartController;
 use App\Http\Controllers\CurrencyController;
+use App\Http\Controllers\DiscordBotController;
 use App\Http\Controllers\EventController;
 use App\Http\Controllers\FeaturedListingController;
 use App\Http\Controllers\GameController;
@@ -41,6 +42,15 @@ Route::get('/stats', [StatsController::class, 'getPlatformStats']);
 
 // Public leaderboard (anyone can view rankings)
 Route::get('/leaderboard', [LeaderboardController::class, 'index']);
+
+// Discord Bot API Routes (protected with custom middleware)
+Route::prefix('discord-bot')->middleware('discord.bot')->group(function () {
+    Route::get('/leaderboard', [DiscordBotController::class, 'getLeaderboard']);
+    Route::get('/listings/recent', [DiscordBotController::class, 'getRecentListings']);
+    Route::get('/users/{username}', [DiscordBotController::class, 'getUserProfile']);
+    Route::get('/search', [DiscordBotController::class, 'search']);
+    Route::get('/stats', [DiscordBotController::class, 'getStats']);
+});
 
 Route::get('/sanctum/csrf-cookie', function () {
     return response()->json(['message' => 'CSRF token set', 'token' => csrf_token()]);
@@ -270,8 +280,14 @@ Route::prefix('auth')->group(function () {
     Route::post('reset-password', [AuthController::class, 'resetPassword']);
 });
 
-// Webhook route (no CSRF protection needed)
+// Webhook routes (no CSRF protection needed)
 Route::post('/stripe/webhook', [StripeWebhookController::class, 'handle'])->withoutMiddleware([\App\Http\Middleware\VerifyCsrfToken::class]);
+
+// Cashier webhook route for subscription management
+Route::post('/stripe/cashier-webhook', [
+    \Laravel\Cashier\Http\Controllers\WebhookController::class,
+    'handleWebhook'
+])->withoutMiddleware([\App\Http\Middleware\VerifyCsrfToken::class]);
 
 // Crypto payment routes
 Route::middleware(['auth:sanctum'])->prefix('crypto')->name('crypto.')->group(function () {
