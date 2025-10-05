@@ -102,10 +102,13 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/wallet/withdrawals/{id}/cancel', [WalletController::class, 'cancelWithdrawal']);
 
     // Subscription Management (Cashier)
+    Route::get('/subscriptions', [SubscriptionController::class, 'index']);
     Route::get('/subscription/current', [SubscriptionController::class, 'current']);
     Route::get('/subscription/invoices', [SubscriptionController::class, 'invoices']);
     Route::post('/subscription/cancel', [SubscriptionController::class, 'cancel']);
     Route::post('/subscription/resume', [SubscriptionController::class, 'resume']);
+    Route::put('/subscriptions/{id}/auto-renew', [SubscriptionController::class, 'updateAutoRenew']);
+    Route::delete('/subscriptions/{id}', [SubscriptionController::class, 'destroy']);
 
     // Seller Subscriptions (now for features only, not tier upgrades)
     Route::get('/seller-subscriptions/tiers', [SellerSubscriptionController::class, 'getTiers']);

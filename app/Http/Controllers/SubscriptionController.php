@@ -190,4 +190,131 @@ class SubscriptionController extends Controller
             return response()->json(['error' => 'Failed to resume subscription'], 500);
         }
     }
+
+    /**
+     * Get all user subscriptions
+     */
+    public function index(Request $request): JsonResponse
+    {
+        $user = $request->user();
+
+        try {
+            // Get all Cashier subscriptions
+            $subscriptions = $user->subscriptions()->get()->map(function ($subscription) {
+                // Determine tier from stripe_price
+                $tier = 'free';
+                if ($subscription->stripe_price === env('STRIPE_PRICE_PREMIUM')) {
+                    $tier = 'premium';
+                } elseif ($subscription->stripe_price === env('STRIPE_PRICE_ELITE')) {
+                    $tier = 'elite';
+                }
+
+                // Get price
+                $price = match($tier) {
+                    'premium' => 9.99,
+                    'elite' => 29.99,
+                    default => 0
+                };
+
+                // Calculate next billing date
+                $nextBillingDate = null;
+                try {
+                    $stripeSubscription = $subscription->asStripeSubscription();
+                    $nextBillingDate = $stripeSubscription->current_period_end
+                        ? date('Y-m-d H:i:s', $stripeSubscription->current_period_end)
+                        : null;
+                } catch (\Exception $e) {
+                    // Fallback calculation
+                    if ($subscription->ends_at) {
+                        $nextBillingDate = $subscription->ends_at;
+                    } else {
+                        $createdDate = \Carbon\Carbon::parse($subscription->created_at);
+                        $now = \Carbon\Carbon::now();
+                        $nextBilling = $createdDate->copy();
+                        while ($nextBilling->lessThan($now)) {
+                            $nextBilling->addMonth();
+                        }
+                        $nextBillingDate = $nextBilling->format('Y-m-d H:i:s');
+                    }
+                }
+
+                return [
+                    'id' => $subscription->id,
+                    'user_id' => $subscription->user_id,
+                    'type' => $subscription->type ?? 'user_subscription',
+                    'tier' => $tier,
+                    'price' => $price,
+                    'status' => $subscription->stripe_status,
+                    'auto_renew' => $subscription->ends_at === null,
+                    'next_billing_date' => $nextBillingDate,
+                    'created_at' => $subscription->created_at,
+                    'cancelled_at' => $subscription->ends_at,
+                    'expires_at' => $subscription->ends_at,
+                ];
+            });
+
+            return response()->json(['subscriptions' => $subscriptions]);
+        } catch (\Exception $e) {
+            \Log::error('Failed to fetch subscriptions: ' . $e->getMessage());
+            return response()->json(['error' => 'Failed to fetch subscriptions'], 500);
+        }
+    }
+
+    /**
+     * Update auto-renew setting
+     */
+    public function updateAutoRenew(Request $request, $subscriptionId): JsonResponse
+    {
+        $user = $request->user();
+
+        $request->validate([
+            'auto_renew' => 'required|boolean'
+        ]);
+
+        try {
+            $subscription = $user->subscriptions()->findOrFail($subscriptionId);
+
+            if ($request->auto_renew) {
+                // Enable auto-renew by resuming
+                if ($subscription->ends_at) {
+                    $subscription->resume();
+                }
+            } else {
+                // Disable auto-renew by canceling at period end
+                if (!$subscription->ends_at) {
+                    $subscription->cancel();
+                }
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => $request->auto_renew ? 'Auto-renew enabled' : 'Auto-renew disabled'
+            ]);
+        } catch (\Exception $e) {
+            \Log::error('Failed to update auto-renew: ' . $e->getMessage());
+            return response()->json(['error' => 'Failed to update auto-renew setting'], 500);
+        }
+    }
+
+    /**
+     * Cancel specific subscription
+     */
+    public function destroy(Request $request, $subscriptionId): JsonResponse
+    {
+        $user = $request->user();
+
+        try {
+            $subscription = $user->subscriptions()->findOrFail($subscriptionId);
+
+            $subscription->cancel();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Subscription will be canceled at the end of the billing period'
+            ]);
+        } catch (\Exception $e) {
+            \Log::error('Failed to cancel subscription: ' . $e->getMessage());
+            return response()->json(['error' => 'Failed to cancel subscription'], 500);
+        }
+    }
 }
