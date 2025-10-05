@@ -20,7 +20,6 @@ use App\Http\Controllers\ProviderController;
 use App\Http\Controllers\ReferralController;
 use App\Http\Controllers\ReviewController;
 use App\Http\Controllers\SeasonController;
-use App\Http\Controllers\SellerSubscriptionController;
 use App\Http\Controllers\ServiceController;
 use App\Http\Controllers\SpinWheelController;
 use App\Http\Controllers\StatsController;
@@ -114,22 +113,17 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/wallet/withdrawals', [WalletController::class, 'withdrawalRequests']);
     Route::post('/wallet/withdrawals/{id}/cancel', [WalletController::class, 'cancelWithdrawal']);
 
-    // Subscription Management (Cashier)
+    // Subscription Management (Cashier) - Unified for all users
     Route::get('/subscriptions', [SubscriptionController::class, 'index']);
-    Route::get('/subscription/current', [SubscriptionController::class, 'current']);
-    Route::get('/subscription/invoices', [SubscriptionController::class, 'invoices']);
-    Route::post('/subscription/cancel', [SubscriptionController::class, 'cancel']);
-    Route::post('/subscription/resume', [SubscriptionController::class, 'resume']);
+    Route::get('/subscriptions/tiers', [SubscriptionController::class, 'getTiers']);
+    Route::get('/subscriptions/current', [SubscriptionController::class, 'current']);
+    Route::post('/subscriptions/setup-intent', [SubscriptionController::class, 'setupIntent']);
+    Route::post('/subscriptions/subscribe', [SubscriptionController::class, 'subscribe']);
+    Route::get('/subscriptions/invoices', [SubscriptionController::class, 'invoices']);
+    Route::post('/subscriptions/cancel', [SubscriptionController::class, 'cancel']);
+    Route::post('/subscriptions/resume', [SubscriptionController::class, 'resume']);
     Route::put('/subscriptions/{id}/auto-renew', [SubscriptionController::class, 'updateAutoRenew']);
     Route::delete('/subscriptions/{id}', [SubscriptionController::class, 'destroy']);
-
-    // Seller Subscriptions (now for features only, not tier upgrades)
-    Route::get('/seller-subscriptions/tiers', [SellerSubscriptionController::class, 'getTiers']);
-    Route::get('/seller-subscriptions/current', [SellerSubscriptionController::class, 'getCurrent']);
-    Route::post('/seller-subscriptions/setup-intent', [SellerSubscriptionController::class, 'setupIntent']);
-    Route::post('/seller-subscriptions', [SellerSubscriptionController::class, 'subscribe']);
-    Route::post('/seller-subscriptions/cancel', [SellerSubscriptionController::class, 'cancel']);
-    Route::post('/seller-subscriptions/resume', [SellerSubscriptionController::class, 'resume']);
 
     // Provider Tier Progress (volume-based)
     Route::get('/provider/tier-progress', [UserController::class, 'getTierProgress']);
