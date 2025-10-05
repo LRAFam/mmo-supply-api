@@ -31,7 +31,7 @@ class GameResource extends Resource
                     ->image()
                     ->disk('s3')
                     ->directory('games/logos')
-                    ->acceptedFileTypes(['image/jpeg', 'image/png', 'image/webp', 'image/avif'])
+                    ->visibility('public')
                     ->maxSize(2048),
 
                 Forms\Components\FileUpload::make('icon')
@@ -39,7 +39,7 @@ class GameResource extends Resource
                     ->image()
                     ->disk('s3')
                     ->directory('games/icons')
-                    ->acceptedFileTypes(['image/jpeg', 'image/png', 'image/webp', 'image/avif'])
+                    ->visibility('public')
                     ->maxSize(1024),
                 Forms\Components\TextInput::make('description')
                     ->maxLength(255),
