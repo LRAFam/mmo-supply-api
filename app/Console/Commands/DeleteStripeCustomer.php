@@ -13,7 +13,7 @@ class DeleteStripeCustomer extends Command
      *
      * @var string
      */
-    protected $signature = 'stripe:delete-customer {customer_id}';
+    protected $signature = 'stripe:delete-customer {customer_id} {--force : Skip confirmation prompt}';
 
     /**
      * The console command description.
@@ -55,10 +55,14 @@ class DeleteStripeCustomer extends Command
                 }
             }
 
-            // Confirm deletion
-            if (!$this->confirm('Are you sure you want to DELETE this customer from Stripe?', false)) {
-                $this->info('Aborted.');
-                return 0;
+            // Confirm deletion (skip if --force flag is used)
+            if (!$this->option('force')) {
+                if (!$this->confirm('Are you sure you want to DELETE this customer from Stripe?', false)) {
+                    $this->info('Aborted.');
+                    return 0;
+                }
+            } else {
+                $this->warn('Skipping confirmation (--force flag used)');
             }
 
             // Delete customer
