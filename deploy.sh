@@ -29,6 +29,10 @@ $FORGE_PHP artisan package:discover --ansi
 $FORGE_PHP artisan config:clear
 $FORGE_PHP artisan config:cache
 
+# Clear Filament cache and rebuild assets
+$FORGE_PHP artisan filament:clear-cache
+$FORGE_PHP artisan filament:assets
+
 # Optimize application
 $FORGE_PHP artisan optimize
 
