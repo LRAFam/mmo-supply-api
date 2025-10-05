@@ -98,6 +98,7 @@ class FixUserSubscription extends Command
             $paymentMethods = \Stripe\PaymentMethod::all([
                 'customer' => $actualCustomerId,
                 'type' => 'card',
+                'limit' => 10,
             ]);
 
             $defaultPaymentMethod = null;
@@ -113,8 +114,51 @@ class FixUserSubscription extends Command
                 ]);
                 $this->info('Set as default payment method');
             } else {
-                $this->warn('No payment method found. Creating subscription without immediate charge...');
-                $this->warn('User will need to add payment method through billing portal.');
+                // Try to find payment method from recent payment intents
+                $this->info('No saved payment methods. Checking recent payment intents...');
+
+                try {
+                    $paymentIntents = \Stripe\PaymentIntent::all([
+                        'customer' => $actualCustomerId,
+                        'limit' => 5,
+                    ]);
+
+                    foreach ($paymentIntents->data as $pi) {
+                        if ($pi->status === 'succeeded' && $pi->payment_method) {
+                            $this->info("Found payment method from payment intent: {$pi->payment_method}");
+
+                            // Attach it to customer if not already attached
+                            try {
+                                $pm = \Stripe\PaymentMethod::retrieve($pi->payment_method);
+                                if (!$pm->customer || $pm->customer !== $actualCustomerId) {
+                                    $pm->attach(['customer' => $actualCustomerId]);
+                                    $this->info('Attached payment method to customer');
+                                }
+
+                                $defaultPaymentMethod = $pi->payment_method;
+
+                                // Set as default
+                                \Stripe\Customer::update($actualCustomerId, [
+                                    'invoice_settings' => [
+                                        'default_payment_method' => $defaultPaymentMethod,
+                                    ],
+                                ]);
+                                $this->info('Set as default payment method');
+                                break;
+                            } catch (\Exception $e) {
+                                $this->warn('Could not attach payment method: ' . $e->getMessage());
+                                continue;
+                            }
+                        }
+                    }
+                } catch (\Exception $e) {
+                    $this->warn('Could not retrieve payment intents: ' . $e->getMessage());
+                }
+
+                if (!$defaultPaymentMethod) {
+                    $this->warn('No payment method found. Creating subscription without immediate charge...');
+                    $this->warn('User will need to add payment method through billing portal.');
+                }
             }
 
             // Create subscription in Stripe
