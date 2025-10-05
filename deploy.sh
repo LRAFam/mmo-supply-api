@@ -29,9 +29,6 @@ $FORGE_PHP artisan package:discover --ansi
 $FORGE_PHP artisan config:clear
 $FORGE_PHP artisan config:cache
 
-# Clear view cache
-$FORGE_PHP artisan view:clear
-
 # Optimize application
 $FORGE_PHP artisan optimize
 
