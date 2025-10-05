@@ -126,8 +126,10 @@ Route::middleware('auth:sanctum')->group(function () {
     // Seller Subscriptions (now for features only, not tier upgrades)
     Route::get('/seller-subscriptions/tiers', [SellerSubscriptionController::class, 'getTiers']);
     Route::get('/seller-subscriptions/current', [SellerSubscriptionController::class, 'getCurrent']);
+    Route::post('/seller-subscriptions/setup-intent', [SellerSubscriptionController::class, 'setupIntent']);
     Route::post('/seller-subscriptions', [SellerSubscriptionController::class, 'subscribe']);
-    Route::delete('/seller-subscriptions', [SellerSubscriptionController::class, 'cancel']);
+    Route::post('/seller-subscriptions/cancel', [SellerSubscriptionController::class, 'cancel']);
+    Route::post('/seller-subscriptions/resume', [SellerSubscriptionController::class, 'resume']);
 
     // Provider Tier Progress (volume-based)
     Route::get('/provider/tier-progress', [UserController::class, 'getTierProgress']);

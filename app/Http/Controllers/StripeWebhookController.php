@@ -8,7 +8,6 @@ use App\Models\Transaction;
 use App\Models\Order;
 use App\Models\Cart;
 use App\Models\FeaturedListing;
-use App\Models\SellerSubscription;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -38,25 +37,9 @@ class StripeWebhookController extends Controller
 
         Log::info('Stripe webhook received', ['type' => $event->type]);
 
-        // Handle checkout.session.completed first to check if it's a custom checkout
-        if ($event->type === 'checkout.session.completed') {
-            $session = $event->data->object;
-
-            // Check if this is a seller subscription checkout
-            if (isset($session->metadata->type) && $session->metadata->type === 'seller_subscription') {
-                Log::info('Handling seller subscription checkout', ['session_id' => $session->id]);
-                $this->handleSellerSubscriptionCheckout($session);
-                return response()->json(['status' => 'success']);
-            }
-
-            // Otherwise delegate to Cashier
-            Log::info('Delegating checkout to Cashier webhook handler');
-            $cashierController = new \Laravel\Cashier\Http\Controllers\WebhookController();
-            return $cashierController->handleWebhook($request);
-        }
-
-        // Cashier subscription events - delegate to Cashier's webhook handler
+        // Cashier handles all subscription events automatically
         $cashierEvents = [
+            'checkout.session.completed',
             'customer.subscription.created',
             'customer.subscription.updated',
             'customer.subscription.deleted',
@@ -136,12 +119,6 @@ class StripeWebhookController extends Controller
         // Handle featured listing payment
         if ($type === 'featured_listing') {
             $this->handleFeaturedListingPayment($paymentIntent, $userId);
-            return;
-        }
-
-        // Handle seller subscription payment
-        if ($type === 'seller_subscription') {
-            $this->handleSellerSubscriptionPayment($paymentIntent, $userId);
             return;
         }
 
@@ -481,196 +458,4 @@ class StripeWebhookController extends Controller
         }
     }
 
-    /**
-     * Handle seller subscription payment
-     */
-    protected function handleSellerSubscriptionPayment($paymentIntent, $userId)
-    {
-        DB::beginTransaction();
-        try {
-            $tier = $paymentIntent->metadata->tier ?? null;
-            $subscriptionId = $paymentIntent->metadata->subscription_id ?? null;
-
-            if (!$tier) {
-                throw new \Exception("Subscription tier missing from payment intent");
-            }
-
-            $user = User::find($userId);
-            if (!$user) {
-                throw new \Exception("User not found: {$userId}");
-            }
-
-            // Check if already processed
-            $existingSubscription = SellerSubscription::where('user_id', $userId)
-                ->where('stripe_payment_intent_id', $paymentIntent->id)
-                ->first();
-
-            if ($existingSubscription) {
-                Log::info('Subscription payment already processed', [
-                    'user_id' => $userId,
-                    'subscription_id' => $existingSubscription->id
-                ]);
-                DB::rollBack();
-                return;
-            }
-
-            // Get tier pricing
-            $pricing = [
-                'premium' => ['price' => 9.99, 'earnings' => 80.0],
-                'elite' => ['price' => 29.99, 'earnings' => 90.0],
-            ];
-
-            $tierInfo = $pricing[$tier] ?? null;
-            if (!$tierInfo) {
-                throw new \Exception("Invalid tier: {$tier}");
-            }
-
-            // Cancel any existing active subscription
-            SellerSubscription::where('user_id', $userId)
-                ->where('expires_at', '>', now())
-                ->update(['is_active' => false]);
-
-            // Create or update subscription
-            $subscription = SellerSubscription::create([
-                'user_id' => $userId,
-                'tier' => $tier,
-                'provider_earnings_percentage' => $tierInfo['earnings'],
-                'monthly_price' => $tierInfo['price'],
-                'starts_at' => now(),
-                'expires_at' => now()->addMonth(),
-                'is_active' => true,
-                'stripe_subscription_id' => $subscriptionId,
-                'stripe_payment_intent_id' => $paymentIntent->id,
-            ]);
-
-            // Create transaction record
-            $wallet = $user->getOrCreateWallet();
-            $amount = $paymentIntent->amount / 100;
-
-            $wallet->transactions()->create([
-                'user_id' => $user->id,
-                'type' => 'payment',
-                'amount' => -$amount,
-                'currency' => strtoupper($paymentIntent->currency),
-                'status' => 'completed',
-                'description' => "Provider subscription ({$tier} tier)",
-                'reference' => $paymentIntent->id,
-                'payment_method' => 'stripe',
-                'metadata' => [
-                    'payment_intent_id' => $paymentIntent->id,
-                    'subscription_id' => $subscription->id,
-                    'tier' => $tier,
-                ],
-            ]);
-
-            Log::info('Seller subscription payment processed successfully', [
-                'subscription_id' => $subscription->id,
-                'user_id' => $userId,
-                'tier' => $tier,
-                'amount' => $amount
-            ]);
-
-            DB::commit();
-        } catch (\Exception $e) {
-            DB::rollBack();
-            Log::error('Failed to process seller subscription payment: ' . $e->getMessage(), [
-                'payment_intent_id' => $paymentIntent->id,
-                'user_id' => $userId
-            ]);
-        }
-    }
-
-    /**
-     * Handle seller subscription checkout completion
-     */
-    protected function handleSellerSubscriptionCheckout($session)
-    {
-        DB::beginTransaction();
-        try {
-            $userId = $session->metadata->user_id ?? null;
-            $tier = $session->metadata->tier ?? null;
-            $subscriptionId = $session->metadata->subscription_id ?? null;
-
-            if (!$userId || !$tier) {
-                throw new \Exception("Missing required metadata in checkout session");
-            }
-
-            $user = User::find($userId);
-            if (!$user) {
-                throw new \Exception("User not found: {$userId}");
-            }
-
-            // Get the Stripe subscription ID from the session
-            $stripeSubscriptionId = $session->subscription ?? null;
-
-            // Find and activate the pending subscription
-            $subscription = null;
-            if ($subscriptionId) {
-                $subscription = SellerSubscription::find($subscriptionId);
-            }
-
-            if (!$subscription) {
-                // If subscription not found by ID, find by user and inactive status
-                $subscription = SellerSubscription::where('user_id', $userId)
-                    ->where('is_active', false)
-                    ->where('tier', $tier)
-                    ->orderBy('created_at', 'desc')
-                    ->first();
-            }
-
-            if ($subscription) {
-                // Update existing subscription
-                $subscription->update([
-                    'is_active' => true,
-                    'stripe_subscription_id' => $stripeSubscriptionId ?? $subscription->stripe_subscription_id,
-                    'started_at' => now(),
-                    'expires_at' => now()->addMonth(),
-                ]);
-
-                Log::info('Seller subscription activated', [
-                    'subscription_id' => $subscription->id,
-                    'user_id' => $userId,
-                    'tier' => $tier
-                ]);
-            } else {
-                // Create new subscription if none exists
-                $pricing = [
-                    'premium' => ['price' => 9.99, 'fee' => 20.0],
-                    'elite' => ['price' => 29.99, 'fee' => 10.0],
-                ];
-
-                $tierInfo = $pricing[$tier] ?? null;
-                if (!$tierInfo) {
-                    throw new \Exception("Invalid tier: {$tier}");
-                }
-
-                // Deactivate existing subscriptions
-                SellerSubscription::where('user_id', $userId)->update(['is_active' => false]);
-
-                $subscription = SellerSubscription::create([
-                    'user_id' => $userId,
-                    'tier' => $tier,
-                    'fee_percentage' => $tierInfo['fee'],
-                    'monthly_price' => $tierInfo['price'],
-                    'started_at' => now(),
-                    'expires_at' => now()->addMonth(),
-                    'is_active' => true,
-                    'stripe_subscription_id' => $stripeSubscriptionId,
-                ]);
-
-                Log::info('New seller subscription created from checkout', [
-                    'subscription_id' => $subscription->id,
-                    'user_id' => $userId,
-                    'tier' => $tier
-                ]);
-            }
-
-            DB::commit();
-        } catch (\Exception $e) {
-            DB::rollBack();
-            Log::error('Failed to process seller subscription checkout: ' . $e->getMessage(), [
-                'session_id' => $session->id
-            ]);
-        }
-    }
 }

@@ -2,11 +2,9 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\SellerSubscription;
-use App\Services\StripePaymentService;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Support\Facades\DB;
+use Laravel\Cashier\Exceptions\IncompletePayment;
 
 class SellerSubscriptionController extends Controller
 {
@@ -15,7 +13,6 @@ class SellerSubscriptionController extends Controller
      */
     public function getTiers(): JsonResponse
     {
-        // Premium Features Plans
         $plans = [
             [
                 'id' => 'free',
@@ -29,6 +26,7 @@ class SellerSubscriptionController extends Controller
                     'Keep 70% of earnings',
                 ],
                 'badge' => null,
+                'stripe_price_id' => null,
             ],
             [
                 'id' => 'premium',
@@ -49,6 +47,7 @@ class SellerSubscriptionController extends Controller
                 'badge' => 'PREMIUM',
                 'badge_color' => 'blue',
                 'popular' => true,
+                'stripe_price_id' => config('services.stripe.premium_price_id'),
             ],
             [
                 'id' => 'elite',
@@ -70,6 +69,7 @@ class SellerSubscriptionController extends Controller
                 ],
                 'badge' => 'ELITE',
                 'badge_color' => 'gold',
+                'stripe_price_id' => config('services.stripe.elite_price_id'),
             ],
         ];
 
@@ -82,133 +82,118 @@ class SellerSubscriptionController extends Controller
     public function getCurrent(Request $request): JsonResponse
     {
         $user = $request->user();
-        $subscription = $user->getActiveSubscription();
+
+        // Check for active subscription
+        $subscription = $user->subscription('premium') ?? $user->subscription('elite');
+
+        if (!$subscription || !$subscription->active()) {
+            return response()->json([
+                'subscription' => null,
+                'tier' => 'free',
+            ]);
+        }
 
         return response()->json([
-            'subscription' => $subscription,
-            'benefits' => $subscription->getBenefits(),
+            'subscription' => [
+                'id' => $subscription->id,
+                'tier' => $subscription->name,
+                'status' => $subscription->stripe_status,
+                'trial_ends_at' => $subscription->trial_ends_at,
+                'ends_at' => $subscription->ends_at,
+                'on_trial' => $subscription->onTrial(),
+                'cancelled' => $subscription->cancelled(),
+            ],
+            'tier' => $subscription->name,
         ]);
     }
 
     /**
-     * Subscribe to a tier
+     * Subscribe to a tier (Cashier approach)
      */
     public function subscribe(Request $request): JsonResponse
     {
         $request->validate([
             'tier' => 'required|in:premium,elite',
-            'payment_method' => 'required|in:wallet,stripe',
+            'payment_method' => 'required|string',
         ]);
 
+        $user = $request->user();
+        $tier = $request->tier;
+
+        // Check if user already has an active subscription to this tier
+        if ($user->subscribed($tier)) {
+            return response()->json([
+                'error' => 'You already have an active subscription to this plan.'
+            ], 400);
+        }
+
         try {
-            DB::beginTransaction();
-
-            $user = $request->user();
-            $tier = $request->tier;
-
-            // Get pricing
-            $prices = [
-                'premium' => 9.99,
-                'elite' => 29.99,
-            ];
-
-            $price = $prices[$tier];
-            $creatorEarnings = match($tier) {
-                'premium' => 80.0, // Creator gets 80%, platform gets 20%
-                'elite' => 90.0,   // Creator gets 90%, platform gets 10%
-            };
-            $feePercentage = 100 - $creatorEarnings;
-
-            // Deactivate any existing subscriptions
-            SellerSubscription::where('user_id', $user->id)->update(['is_active' => false]);
-
-            // Handle payment
-            if ($request->payment_method === 'wallet') {
-                $wallet = $user->getOrCreateWallet();
-                if ($wallet->balance < $price) {
-                    return response()->json(['error' => 'Insufficient wallet balance'], 400);
-                }
-
-                $wallet->purchase($price, null, "Seller subscription: {$tier}");
-
-                // Create subscription
-                $subscription = SellerSubscription::create([
-                    'user_id' => $user->id,
-                    'tier' => $tier,
-                    'fee_percentage' => $feePercentage,
-                    'monthly_price' => $price,
-                    'started_at' => now(),
-                    'expires_at' => now()->addMonth(),
-                    'is_active' => true,
+            // Ensure user is a Stripe customer
+            if (!$user->hasStripeId()) {
+                $user->createAsStripeCustomer([
+                    'name' => $user->name,
+                    'email' => $user->email,
                 ]);
-
-                DB::commit();
-
-                return response()->json([
-                    'message' => 'Subscription activated successfully',
-                    'subscription' => $subscription,
-                ], 201);
-
-            } elseif ($request->payment_method === 'stripe') {
-                // Create subscription first to get ID
-                $subscription = SellerSubscription::create([
-                    'user_id' => $user->id,
-                    'tier' => $tier,
-                    'fee_percentage' => $feePercentage,
-                    'monthly_price' => $price,
-                    'started_at' => now(),
-                    'expires_at' => now()->addMonth(),
-                    'is_active' => false, // Will be activated by webhook
-                ]);
-
-                // Create Stripe Checkout Session for subscription
-                $stripeService = new StripePaymentService();
-                \Stripe\Stripe::setApiKey(config('services.stripe.secret'));
-
-                $checkoutSession = \Stripe\Checkout\Session::create([
-                    'customer' => $stripeService->getOrCreateCustomer($user),
-                    'payment_method_types' => ['card'],
-                    'line_items' => [[
-                        'price_data' => [
-                            'currency' => 'usd',
-                            'product_data' => [
-                                'name' => ucfirst($tier) . ' Membership',
-                                'description' => 'Monthly premium membership for MMO Supply',
-                            ],
-                            'unit_amount' => (int)($price * 100),
-                            'recurring' => [
-                                'interval' => 'month',
-                            ],
-                        ],
-                        'quantity' => 1,
-                    ]],
-                    'mode' => 'subscription',
-                    'success_url' => config('app.frontend_url', 'http://localhost:3000') . '/provider/subscription?session_id={CHECKOUT_SESSION_ID}',
-                    'cancel_url' => config('app.frontend_url', 'http://localhost:3000') . '/provider/subscription',
-                    'metadata' => [
-                        'user_id' => $user->id,
-                        'type' => 'seller_subscription',
-                        'tier' => $tier,
-                        'subscription_id' => $subscription->id,
-                    ],
-                ]);
-
-                // Store checkout session ID
-                $subscription->update(['stripe_subscription_id' => $checkoutSession->id]);
-
-                DB::commit();
-
-                return response()->json([
-                    'message' => 'Checkout session created',
-                    'subscription' => $subscription,
-                    'requires_payment' => true,
-                    'checkout_url' => $checkoutSession->url,
-                ], 201);
             }
 
+            // Get the Stripe price ID
+            $priceId = $tier === 'elite'
+                ? config('services.stripe.elite_price_id')
+                : config('services.stripe.premium_price_id');
+
+            // Create subscription using Cashier
+            $subscription = $user->newSubscription($tier, $priceId)
+                ->create($request->payment_method);
+
+            return response()->json([
+                'message' => 'Subscription created successfully!',
+                'subscription' => [
+                    'id' => $subscription->id,
+                    'status' => $subscription->stripe_status,
+                    'tier' => $subscription->name,
+                    'trial_ends_at' => $subscription->trial_ends_at,
+                    'ends_at' => $subscription->ends_at,
+                ],
+            ], 201);
+
+        } catch (IncompletePayment $exception) {
+            return response()->json([
+                'message' => 'Payment requires additional confirmation',
+                'payment_intent' => $exception->payment->id,
+                'client_secret' => $exception->payment->client_secret,
+            ], 402);
         } catch (\Exception $e) {
-            DB::rollBack();
-            return response()->json(['error' => 'Failed to create subscription: ' . $e->getMessage()], 500);
+            return response()->json([
+                'error' => 'Failed to create subscription: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Create setup intent for adding payment method
+     */
+    public function setupIntent(Request $request): JsonResponse
+    {
+        $user = $request->user();
+
+        try {
+            // Ensure user is a Stripe customer
+            if (!$user->hasStripeId()) {
+                $user->createAsStripeCustomer([
+                    'name' => $user->name,
+                    'email' => $user->email,
+                ]);
+            }
+
+            $intent = $user->createSetupIntent();
+
+            return response()->json([
+                'client_secret' => $intent->client_secret,
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'error' => 'Failed to create setup intent: ' . $e->getMessage()
+            ], 500);
         }
     }
 
@@ -219,18 +204,53 @@ class SellerSubscriptionController extends Controller
     {
         $user = $request->user();
 
-        $subscription = $user->sellerSubscription()
-            ->where('is_active', true)
-            ->first();
+        $subscription = $user->subscription('premium') ?? $user->subscription('elite');
 
         if (!$subscription) {
             return response()->json(['error' => 'No active subscription found'], 404);
         }
 
-        $subscription->update(['is_active' => false]);
+        if ($subscription->cancelled()) {
+            return response()->json(['error' => 'Subscription is already cancelled'], 400);
+        }
 
-        return response()->json([
-            'message' => 'Subscription cancelled successfully',
-        ]);
+        try {
+            // Cancel at period end
+            $subscription->cancel();
+
+            return response()->json([
+                'message' => 'Subscription cancelled successfully. You will retain access until the end of your billing period.',
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'error' => 'Failed to cancel subscription: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Resume cancelled subscription
+     */
+    public function resume(Request $request): JsonResponse
+    {
+        $user = $request->user();
+
+        $subscription = $user->subscription('premium') ?? $user->subscription('elite');
+
+        if (!$subscription || !$subscription->cancelled()) {
+            return response()->json(['error' => 'No cancelled subscription found'], 404);
+        }
+
+        try {
+            $subscription->resume();
+
+            return response()->json([
+                'message' => 'Subscription resumed successfully!',
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'error' => 'Failed to resume subscription: ' . $e->getMessage()
+            ], 500);
+        }
     }
 }
