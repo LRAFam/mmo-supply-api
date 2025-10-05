@@ -24,13 +24,14 @@ use App\Http\Controllers\ServiceController;
 use App\Http\Controllers\SpinWheelController;
 use App\Http\Controllers\StatsController;
 use App\Http\Controllers\StripePaymentController;
+use App\Http\Controllers\StripeConnectController;
 use App\Http\Controllers\StripeWebhookController;
 use App\Http\Controllers\SubscriptionController;
 use App\Http\Controllers\UploadController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\UserStatsController;
 use App\Http\Controllers\WalletController;
-use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\CryptoPaymentController;use Illuminate\Support\Facades\Route;
 use Illuminate\Http\Request;
 
 Route::middleware('auth:sanctum')->get('/user', [UserController::class, 'me']);
@@ -54,16 +55,23 @@ Route::middleware(['auth:sanctum'])->prefix('users')->name('users.')->group(func
     Route::put('/edit', [UserController::class, 'edit'])->name('edit');
 });
 
-Route::middleware(['auth:sanctum'])->prefix('stripe')->name('stripe.')->group(function () {
+Route::middleware(["auth:sanctum"])->prefix("stripe")->name("stripe.")->group(function () {
     // Stripe API routes
-    Route::post('/create-payment-intent', [PaymentController::class, 'createPaymentIntent']);
-    Route::get('/payment-intent/{paymentIntentId}', [StripePaymentController::class, 'getPaymentIntent']);
+    Route::post("/create-payment-intent", [PaymentController::class, "createPaymentIntent"]);
+    Route::get("/payment-intent/{paymentIntentId}", [StripePaymentController::class, "getPaymentIntent"]);
     // Subscription routes
-    Route::post('/subscribe', [PaymentController::class, 'createSubscriptionCheckoutSession']);
-    Route::post('/cancel-subscription', [SubscriptionController::class, 'cancelSubscription']);
-    Route::get('/subscription-status', [SubscriptionController::class, 'subscriptionStatus']);
-});
+    Route::post("/subscribe", [PaymentController::class, "createSubscriptionCheckoutSession"]);
 
+    // Stripe Connect routes
+    Route::prefix("connect")->name("connect.")->group(function () {
+        Route::post("/account-link", [StripeConnectController::class, "createAccountLink"]);
+        Route::get("/account-status", [StripeConnectController::class, "getAccountStatus"]);
+        Route::post("/dashboard-link", [StripeConnectController::class, "createDashboardLink"]);
+        Route::post("/payout", [StripeConnectController::class, "requestPayout"]);
+        Route::get("/payouts", [StripeConnectController::class, "getPayouts"]);
+        Route::post("/disconnect", [StripeConnectController::class, "disconnect"]);
+    });
+});
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('/cart/add', [CartController::class, 'add']);
     Route::get('/cart', [CartController::class, 'getCart']);
@@ -261,3 +269,17 @@ Route::prefix('auth')->group(function () {
 
 // Webhook route (no CSRF protection needed)
 Route::post('/stripe/webhook', [StripeWebhookController::class, 'handle'])->withoutMiddleware([\App\Http\Middleware\VerifyCsrfToken::class]);
+
+// Crypto payment routes
+Route::middleware(['auth:sanctum'])->prefix('crypto')->name('crypto.')->group(function () {
+    Route::get('/currencies', [CryptoPaymentController::class, 'getAvailableCurrencies']);
+    Route::get('/min-amount', [CryptoPaymentController::class, 'getMinimumAmount']);
+    Route::post('/deposit', [CryptoPaymentController::class, 'createDeposit']);
+    Route::post('/payout', [CryptoPaymentController::class, 'createPayout']);
+    Route::get('/payment/{paymentId}', [CryptoPaymentController::class, 'getPaymentStatus']);
+    Route::get('/transactions', [CryptoPaymentController::class, 'getTransactions']);
+});
+
+// Crypto webhooks (no auth required)
+Route::post('/crypto/webhook', [CryptoPaymentController::class, 'handleWebhook']);
+Route::post('/crypto/payout-webhook', [CryptoPaymentController::class, 'handleWebhook']);
