@@ -15,21 +15,21 @@ class FixUserSubscription extends Command
      *
      * @var string
      */
-    protected $signature = 'subscription:fix {email} {tier=premium}';
+    protected $signature = 'subscription:fix {customer_id} {tier=premium}';
 
     /**
      * The console command description.
      *
      * @var string
      */
-    protected $description = 'Manually create a subscription for a user who paid but subscription was not created';
+    protected $description = 'Manually create a subscription for a user who paid but subscription was not created. Use Stripe customer ID (e.g., cus_XXX)';
 
     /**
      * Execute the console command.
      */
     public function handle()
     {
-        $email = $this->argument('email');
+        $customerId = $this->argument('customer_id');
         $tier = $this->argument('tier');
 
         if (!in_array($tier, ['premium', 'elite'])) {
@@ -37,10 +37,12 @@ class FixUserSubscription extends Command
             return 1;
         }
 
-        $user = User::where('email', $email)->first();
+        // Find user by Stripe customer ID
+        $user = User::where('stripe_id', $customerId)->first();
 
         if (!$user) {
-            $this->error("User not found with email: {$email}");
+            $this->error("User not found with Stripe customer ID: {$customerId}");
+            $this->info("Make sure the customer ID is correct (e.g., cus_XXX)");
             return 1;
         }
 
@@ -51,6 +53,7 @@ class FixUserSubscription extends Command
         }
 
         $this->info("Creating {$tier} subscription for {$user->name} ({$user->email})...");
+        $this->info("Stripe Customer ID: {$customerId}");
 
         try {
             Stripe::setApiKey(config('services.stripe.secret'));
@@ -69,16 +72,14 @@ class FixUserSubscription extends Command
 
             DB::beginTransaction();
 
-            // Create or get Stripe customer
-            if (!$user->stripe_id) {
-                $this->info('Creating Stripe customer...');
-                $user->createAsStripeCustomer([
-                    'email' => $user->email,
-                    'name' => $user->name,
-                ]);
-                $this->info("Stripe customer created: {$user->stripe_id}");
-            } else {
-                $this->info("Using existing Stripe customer: {$user->stripe_id}");
+            // Verify Stripe customer exists
+            $this->info("Verifying Stripe customer: {$user->stripe_id}");
+            try {
+                $stripeCustomer = \Stripe\Customer::retrieve($user->stripe_id);
+                $this->info("✓ Customer found: {$stripeCustomer->email}");
+            } catch (\Exception $e) {
+                $this->error("Failed to retrieve Stripe customer: " . $e->getMessage());
+                return 1;
             }
 
             // Try to find and attach an existing payment method
