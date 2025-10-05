@@ -95,6 +95,7 @@ function s3ImageUploadComponent({ state, uploadEndpoint, multiple }) {
                 body: formData,
                 headers: {
                     'Accept': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || ''
                 }
             });
 
