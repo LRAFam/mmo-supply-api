@@ -39,29 +39,61 @@ class PaymentController extends Controller
                 ? config('services.stripe.elite_price_id')
                 : config('services.stripe.premium_price_id');
 
-            if (!$priceId) {
+            if (!$priceId || str_starts_with($priceId, 'price_premium') || str_starts_with($priceId, 'price_elite')) {
+                \Log::error('Invalid subscription price ID configured', [
+                    'tier' => $request->tier,
+                    'price_id' => $priceId
+                ]);
                 return response()->json([
-                    'message' => 'Subscription price not configured'
+                    'message' => 'Subscription price not configured properly. Please contact support.'
                 ], 500);
             }
 
-            // Create Stripe Checkout Session
+            // Ensure user has Stripe customer ID
+            if (!$user->stripe_id) {
+                $user->createAsStripeCustomer([
+                    'email' => $user->email,
+                    'name' => $user->name,
+                ]);
+            }
+
+            \Log::info('Creating subscription checkout session', [
+                'user_id' => $user->id,
+                'tier' => $request->tier,
+                'price_id' => $priceId,
+                'stripe_customer_id' => $user->stripe_id
+            ]);
+
+            // Create Stripe Checkout Session for recurring subscription
             $checkoutSession = $user->newSubscription('default', $priceId)
                 ->checkout([
                     'success_url' => config('app.frontend_url') . '/subscription/success?session_id={CHECKOUT_SESSION_ID}',
                     'cancel_url' => config('app.frontend_url') . '/subscription',
+                    'metadata' => [
+                        'user_id' => $user->id,
+                        'tier' => $request->tier,
+                    ],
                 ]);
+
+            \Log::info('Checkout session created successfully', [
+                'session_id' => $checkoutSession->id,
+                'user_id' => $user->id
+            ]);
 
             return response()->json([
                 'checkout_url' => $checkoutSession->url,
                 'session_id' => $checkoutSession->id,
             ]);
         } catch (\Exception $e) {
-            \Log::error('Subscription checkout error: ' . $e->getMessage());
+            \Log::error('Subscription checkout error: ' . $e->getMessage(), [
+                'user_id' => $user->id,
+                'tier' => $request->tier,
+                'trace' => $e->getTraceAsString()
+            ]);
 
             return response()->json([
                 'message' => 'Failed to create checkout session',
-                'error' => $e->getMessage()
+                'error' => config('app.debug') ? $e->getMessage() : 'An error occurred. Please try again or contact support.'
             ], 500);
         }
     }
