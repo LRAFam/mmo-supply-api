@@ -37,8 +37,10 @@ class FixUserSubscription extends Command
             return 1;
         }
 
-        // Find user by Stripe customer ID
-        $user = User::where('stripe_id', $customerId)->first();
+        // Find user by Stripe customer ID (try both stripe_id and stripe_customer_id)
+        $user = User::where('stripe_id', $customerId)
+            ->orWhere('stripe_customer_id', $customerId)
+            ->first();
 
         if (!$user) {
             $this->error("User not found with Stripe customer ID: {$customerId}");
@@ -72,11 +74,20 @@ class FixUserSubscription extends Command
 
             DB::beginTransaction();
 
+            // Get the actual Stripe customer ID
+            $actualCustomerId = $user->stripe_id ?? $user->stripe_customer_id ?? $customerId;
+
             // Verify Stripe customer exists
-            $this->info("Verifying Stripe customer: {$user->stripe_id}");
+            $this->info("Verifying Stripe customer: {$actualCustomerId}");
             try {
-                $stripeCustomer = \Stripe\Customer::retrieve($user->stripe_id);
+                $stripeCustomer = \Stripe\Customer::retrieve($actualCustomerId);
                 $this->info("✓ Customer found: {$stripeCustomer->email}");
+
+                // Update user's stripe_id if missing (Cashier needs this)
+                if (!$user->stripe_id) {
+                    $user->update(['stripe_id' => $actualCustomerId]);
+                    $this->info("✓ Updated user's stripe_id field");
+                }
             } catch (\Exception $e) {
                 $this->error("Failed to retrieve Stripe customer: " . $e->getMessage());
                 return 1;
@@ -85,7 +96,7 @@ class FixUserSubscription extends Command
             // Try to find and attach an existing payment method
             $this->info('Looking for existing payment methods...');
             $paymentMethods = \Stripe\PaymentMethod::all([
-                'customer' => $user->stripe_id,
+                'customer' => $actualCustomerId,
                 'type' => 'card',
             ]);
 
@@ -95,7 +106,7 @@ class FixUserSubscription extends Command
                 $this->info("Found payment method: {$defaultPaymentMethod}");
 
                 // Set as default payment method
-                \Stripe\Customer::update($user->stripe_id, [
+                \Stripe\Customer::update($actualCustomerId, [
                     'invoice_settings' => [
                         'default_payment_method' => $defaultPaymentMethod,
                     ],
@@ -109,7 +120,7 @@ class FixUserSubscription extends Command
             // Create subscription in Stripe
             $this->info('Creating subscription in Stripe...');
             $subscriptionData = [
-                'customer' => $user->stripe_id,
+                'customer' => $actualCustomerId,
                 'items' => [
                     ['price' => $priceId],
                 ],
