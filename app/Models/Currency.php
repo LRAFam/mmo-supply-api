@@ -16,17 +16,33 @@ class Currency extends Model
         'stock',
         'rate',
         'price_per_unit',
+        'discount_price',
         'min_amount',
         'max_amount',
+        'bulk_pricing',
         'images',
+        'tags',
+        'delivery_method',
+        'requirements',
+        'warranty_days',
+        'refund_policy',
+        'auto_deactivate',
+        'seo_title',
+        'seo_description',
         'is_active',
+        'featured_until',
     ];
 
     protected $casts = [
         'images' => 'array',
+        'tags' => 'array',
+        'bulk_pricing' => 'array',
         'is_active' => 'boolean',
+        'auto_deactivate' => 'boolean',
         'price_per_unit' => 'decimal:2',
+        'discount_price' => 'decimal:2',
         'rate' => 'decimal:2',
+        'featured_until' => 'datetime',
     ];
 
     protected $appends = ['rating', 'total_sales', 'vouches', 'is_verified'];

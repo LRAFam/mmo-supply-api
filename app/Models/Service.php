@@ -19,17 +19,38 @@ class Service extends Model
         'images',
         'price',
         'discount',
+        'discount_price',
         'is_active',
         'is_featured',
+        'featured_until',
         'estimated_time',
+        'delivery_method',
+        'tags',
+        'packages',
+        'addons',
+        'requirements',
+        'schedule',
+        'max_concurrent_orders',
+        'warranty_days',
+        'refund_policy',
+        'auto_deactivate',
+        'seo_title',
+        'seo_description',
     ];
 
     protected $casts = [
         'images' => 'array',
+        'tags' => 'array',
+        'packages' => 'array',
+        'addons' => 'array',
+        'schedule' => 'array',
         'price' => 'decimal:2',
         'discount' => 'decimal:2',
+        'discount_price' => 'decimal:2',
         'is_active' => 'boolean',
         'is_featured' => 'boolean',
+        'auto_deactivate' => 'boolean',
+        'featured_until' => 'datetime',
     ];
 
     protected $appends = ['images_urls'];
