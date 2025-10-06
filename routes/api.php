@@ -66,6 +66,9 @@ Route::middleware(['auth:sanctum'])->prefix('users')->name('users.')->group(func
     Route::get('/{user}', [UserController::class, 'show'])->name('show');
     Route::put('/edit', [UserController::class, 'edit'])->name('edit');
     Route::post('/become-seller', [UserController::class, 'becomeSeller'])->name('becomeSeller');
+    Route::get('/provider-games', [UserController::class, 'getProviderGames'])->name('providerGames');
+    Route::post('/provider-games', [UserController::class, 'addProviderGame'])->name('addProviderGame');
+    Route::delete('/provider-games/{providerId}', [UserController::class, 'removeProviderGame'])->name('removeProviderGame');
 });
 
 Route::middleware(["auth:sanctum"])->prefix("stripe")->name("stripe.")->group(function () {

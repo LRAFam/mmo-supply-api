@@ -166,4 +166,134 @@ class UserController extends Controller
             ],
         ], 201);
     }
+
+    /**
+     * Get seller's provider games
+     */
+    public function getProviderGames(Request $request): JsonResponse
+    {
+        $user = $request->user();
+
+        if (!$user->is_seller) {
+            return response()->json([
+                'error' => 'Not a seller'
+            ], 403);
+        }
+
+        $providers = \App\Models\Provider::where('user_id', $user->id)
+            ->with('game')
+            ->get();
+
+        return response()->json([
+            'success' => true,
+            'providers' => $providers->map(fn($p) => [
+                'id' => $p->id,
+                'game_id' => $p->game_id,
+                'game' => [
+                    'id' => $p->game->id,
+                    'title' => $p->game->title,
+                ],
+                'vouches' => $p->vouches,
+                'rating' => $p->rating,
+                'created_at' => $p->created_at,
+            ])
+        ]);
+    }
+
+    /**
+     * Add a new provider game
+     */
+    public function addProviderGame(Request $request): JsonResponse
+    {
+        $user = $request->user();
+
+        if (!$user->is_seller) {
+            return response()->json([
+                'error' => 'Not a seller'
+            ], 403);
+        }
+
+        $validated = $request->validate([
+            'game_id' => 'required|exists:games,id',
+        ]);
+
+        // Check if provider already exists
+        $existing = \App\Models\Provider::where('user_id', $user->id)
+            ->where('game_id', $validated['game_id'])
+            ->first();
+
+        if ($existing) {
+            return response()->json([
+                'error' => 'You are already a provider for this game'
+            ], 400);
+        }
+
+        $provider = \App\Models\Provider::create([
+            'user_id' => $user->id,
+            'game_id' => $validated['game_id'],
+            'vouches' => 0,
+            'rating' => null,
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Successfully added as provider for this game',
+            'provider' => $provider,
+        ], 201);
+    }
+
+    /**
+     * Remove a provider game
+     */
+    public function removeProviderGame(Request $request, $providerId): JsonResponse
+    {
+        $user = $request->user();
+
+        if (!$user->is_seller) {
+            return response()->json([
+                'error' => 'Not a seller'
+            ], 403);
+        }
+
+        $provider = \App\Models\Provider::where('id', $providerId)
+            ->where('user_id', $user->id)
+            ->first();
+
+        if (!$provider) {
+            return response()->json([
+                'error' => 'Provider not found'
+            ], 404);
+        }
+
+        // Check if seller has active listings for this game
+        $hasActiveListings = \App\Models\Item::where('user_id', $user->id)
+            ->where('game_id', $provider->game_id)
+            ->where('is_active', true)
+            ->exists()
+            || \App\Models\Currency::where('user_id', $user->id)
+            ->where('game_id', $provider->game_id)
+            ->where('is_active', true)
+            ->exists()
+            || \App\Models\Account::where('user_id', $user->id)
+            ->where('game_id', $provider->game_id)
+            ->where('is_active', true)
+            ->exists()
+            || \App\Models\Service::where('user_id', $user->id)
+            ->where('game_id', $provider->game_id)
+            ->where('is_active', true)
+            ->exists();
+
+        if ($hasActiveListings) {
+            return response()->json([
+                'error' => 'Cannot remove game while you have active listings for it. Please deactivate all listings first.'
+            ], 400);
+        }
+
+        $provider->delete();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Successfully removed as provider for this game',
+        ]);
+    }
 }
