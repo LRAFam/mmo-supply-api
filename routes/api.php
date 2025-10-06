@@ -63,12 +63,13 @@ Route::middleware(['auth:sanctum'])->prefix('users')->name('users.')->group(func
     Route::get('/me', [UserController::class, 'me'])->name('me');
     Route::get('/me/subscriptions', [UserController::class, 'getMySubscriptions'])->name('mySubscriptions');
     Route::get('/me/stats', [UserStatsController::class, 'getUserStats'])->name('myStats');
-    Route::get('/{user}', [UserController::class, 'show'])->name('show');
     Route::put('/edit', [UserController::class, 'edit'])->name('edit');
     Route::post('/become-seller', [UserController::class, 'becomeSeller'])->name('becomeSeller');
     Route::get('/provider-games', [UserController::class, 'getProviderGames'])->name('providerGames');
     Route::post('/provider-games', [UserController::class, 'addProviderGame'])->name('addProviderGame');
     Route::delete('/provider-games/{providerId}', [UserController::class, 'removeProviderGame'])->name('removeProviderGame');
+    // This wildcard route must be last to avoid catching specific routes above
+    Route::get('/{user}', [UserController::class, 'show'])->name('show');
 });
 
 Route::middleware(["auth:sanctum"])->prefix("stripe")->name("stripe.")->group(function () {
