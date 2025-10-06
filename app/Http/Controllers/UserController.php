@@ -81,6 +81,33 @@ class UserController extends Controller
     }
 
     /**
+     * Show user profile (authenticated)
+     */
+    public function show($userId): JsonResponse
+    {
+        $user = User::find($userId);
+
+        if (!$user) {
+            return response()->json(['error' => 'User not found'], 404);
+        }
+
+        return response()->json([
+            'success' => true,
+            'user' => [
+                'id' => $user->id,
+                'name' => $user->name,
+                'email' => $user->email,
+                'avatar' => $user->avatar,
+                'bio' => $user->bio,
+                'is_seller' => (bool) $user->is_seller,
+                'seller_tier' => $user->seller_tier,
+                'subscription_tier' => $user->getSubscriptionTier(),
+                'created_at' => $user->created_at,
+            ],
+        ]);
+    }
+
+    /**
      * Show public user profile (no authentication required)
      */
     public function showPublic($username)
