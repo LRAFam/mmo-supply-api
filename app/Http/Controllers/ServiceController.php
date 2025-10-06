@@ -59,20 +59,26 @@ class ServiceController extends Controller
             'title' => 'required|string|max:255',
             'description' => 'required|string',
             'price' => 'required|numeric|min:0',
-            'delivery_time' => 'nullable|string',
-            'image_url' => 'nullable|string',
-            'images' => 'nullable|string',
+            'discount_price' => 'nullable|numeric|min:0',
+            'estimated_time' => 'nullable|string',
+            'images' => 'nullable|array',
+            'images.*' => 'string',
+            'tags' => 'nullable|array',
+            'tags.*' => 'string',
+            'packages' => 'nullable|array',
+            'addons' => 'nullable|array',
+            'schedule' => 'nullable|array',
+            'max_concurrent_orders' => 'nullable|integer|min:1',
+            'delivery_method' => 'nullable|string',
+            'requirements' => 'nullable|string',
+            'warranty_days' => 'nullable|integer|min:0',
+            'refund_policy' => 'nullable|string',
+            'seo_title' => 'nullable|string|max:255',
+            'seo_description' => 'nullable|string|max:500',
+            'auto_deactivate' => 'nullable|boolean',
+            'is_featured' => 'nullable|boolean',
+            'featured_until' => 'nullable|date',
         ]);
-
-        // Prepare images array
-        $images = [];
-        if (!empty($validated['image_url'])) {
-            $images[] = $validated['image_url'];
-        }
-        if (!empty($validated['images'])) {
-            $additionalImages = explode(',', $validated['images']);
-            $images = array_merge($images, $additionalImages);
-        }
 
         $service = Service::create([
             'user_id' => $request->user()->id,
@@ -81,8 +87,23 @@ class ServiceController extends Controller
             'slug' => \Illuminate\Support\Str::slug($validated['title']) . '-' . uniqid(),
             'description' => $validated['description'],
             'price' => $validated['price'],
-            'estimated_time' => $validated['delivery_time'] ?? null,
-            'images' => $images,
+            'discount_price' => $validated['discount_price'] ?? null,
+            'estimated_time' => $validated['estimated_time'] ?? null,
+            'images' => $validated['images'] ?? [],
+            'tags' => $validated['tags'] ?? [],
+            'packages' => $validated['packages'] ?? null,
+            'addons' => $validated['addons'] ?? null,
+            'schedule' => $validated['schedule'] ?? null,
+            'max_concurrent_orders' => $validated['max_concurrent_orders'] ?? 5,
+            'delivery_method' => $validated['delivery_method'] ?? null,
+            'requirements' => $validated['requirements'] ?? null,
+            'warranty_days' => $validated['warranty_days'] ?? 0,
+            'refund_policy' => $validated['refund_policy'] ?? null,
+            'seo_title' => $validated['seo_title'] ?? null,
+            'seo_description' => $validated['seo_description'] ?? null,
+            'auto_deactivate' => $validated['auto_deactivate'] ?? false,
+            'is_featured' => $validated['is_featured'] ?? false,
+            'featured_until' => $validated['featured_until'] ?? null,
             'is_active' => true,
         ]);
 

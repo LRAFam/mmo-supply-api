@@ -52,35 +52,53 @@ class CurrencyController extends Controller
     {
         $validated = $request->validate([
             'game_id' => 'required|exists:games,id',
-            'title' => 'required|string|max:255',
+            'name' => 'required|string|max:255',
             'description' => 'required|string',
             'price' => 'required|numeric|min:0',
+            'discount_price' => 'nullable|numeric|min:0',
             'stock' => 'required|integer|min:1',
+            'min_amount' => 'nullable|integer|min:1',
+            'max_amount' => 'nullable|integer|min:1',
             'amount' => 'nullable|string',
-            'image_url' => 'nullable|string',
-            'images' => 'nullable|string',
+            'images' => 'nullable|array',
+            'images.*' => 'string',
+            'tags' => 'nullable|array',
+            'tags.*' => 'string',
+            'bulk_pricing' => 'nullable|array',
+            'delivery_method' => 'nullable|string',
+            'requirements' => 'nullable|string',
+            'warranty_days' => 'nullable|integer|min:0',
+            'refund_policy' => 'nullable|string',
+            'seo_title' => 'nullable|string|max:255',
+            'seo_description' => 'nullable|string|max:500',
+            'auto_deactivate' => 'nullable|boolean',
+            'is_featured' => 'nullable|boolean',
+            'featured_until' => 'nullable|date',
         ]);
-
-        // Prepare images array
-        $images = [];
-        if (!empty($validated['image_url'])) {
-            $images[] = $validated['image_url'];
-        }
-        if (!empty($validated['images'])) {
-            $additionalImages = explode(',', $validated['images']);
-            $images = array_merge($images, $additionalImages);
-        }
 
         $currency = Currency::create([
             'user_id' => $request->user()->id,
             'game_id' => $validated['game_id'],
-            'name' => $validated['title'],
-            'slug' => \Illuminate\Support\Str::slug($validated['title']) . '-' . uniqid(),
-            'description' => $validated['description'] . ($validated['amount'] ? "\n\nAmount: " . $validated['amount'] : ''),
+            'name' => $validated['name'],
+            'slug' => \Illuminate\Support\Str::slug($validated['name']) . '-' . uniqid(),
+            'description' => $validated['description'],
             'price_per_unit' => $validated['price'],
+            'discount_price' => $validated['discount_price'] ?? null,
             'stock' => $validated['stock'],
-            'images' => $images,
+            'min_amount' => $validated['min_amount'] ?? 1,
+            'max_amount' => $validated['max_amount'] ?? null,
+            'images' => $validated['images'] ?? [],
+            'tags' => $validated['tags'] ?? [],
+            'bulk_pricing' => $validated['bulk_pricing'] ?? null,
+            'delivery_method' => $validated['delivery_method'] ?? null,
+            'requirements' => $validated['requirements'] ?? null,
+            'warranty_days' => $validated['warranty_days'] ?? 0,
+            'refund_policy' => $validated['refund_policy'] ?? null,
+            'seo_title' => $validated['seo_title'] ?? null,
+            'seo_description' => $validated['seo_description'] ?? null,
+            'auto_deactivate' => $validated['auto_deactivate'] ?? false,
             'is_active' => true,
+            'featured_until' => $validated['featured_until'] ?? null,
         ]);
 
         // Create or update provider record for this user+game combination

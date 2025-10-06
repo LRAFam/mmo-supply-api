@@ -57,33 +57,54 @@ class ItemController extends Controller
     {
         $validated = $request->validate([
             'game_id' => 'required|exists:games,id',
-            'title' => 'required|string|max:255',
+            'name' => 'required|string|max:255',
             'description' => 'required|string',
             'price' => 'required|numeric|min:0',
+            'discount_price' => 'nullable|numeric|min:0',
             'stock' => 'required|integer|min:1',
-            'image_url' => 'nullable|string',
-            'images' => 'nullable|string',
+            'min_quantity' => 'nullable|integer|min:1',
+            'max_quantity' => 'nullable|integer|min:1',
+            'images' => 'nullable|array',
+            'images.*' => 'string',
+            'tags' => 'nullable|array',
+            'tags.*' => 'string',
+            'variants' => 'nullable|array',
+            'delivery_method' => 'nullable|string',
+            'delivery_time' => 'nullable|string',
+            'requirements' => 'nullable|string',
+            'warranty_days' => 'nullable|integer|min:0',
+            'refund_policy' => 'nullable|string',
+            'seo_title' => 'nullable|string|max:255',
+            'seo_description' => 'nullable|string|max:500',
+            'auto_deactivate' => 'nullable|boolean',
+            'is_featured' => 'nullable|boolean',
+            'featured_until' => 'nullable|date',
         ]);
-
-        // Prepare images array
-        $images = [];
-        if (!empty($validated['image_url'])) {
-            $images[] = $validated['image_url'];
-        }
-        if (!empty($validated['images'])) {
-            $additionalImages = explode(',', $validated['images']);
-            $images = array_merge($images, $additionalImages);
-        }
 
         $item = Item::create([
             'user_id' => $request->user()->id,
             'game_id' => $validated['game_id'],
-            'name' => $validated['title'],
-            'slug' => \Illuminate\Support\Str::slug($validated['title']) . '-' . uniqid(),
+            'name' => $validated['name'],
+            'slug' => \Illuminate\Support\Str::slug($validated['name']) . '-' . uniqid(),
             'description' => $validated['description'],
             'price' => $validated['price'],
+            'discount_price' => $validated['discount_price'] ?? null,
             'stock' => $validated['stock'],
-            'images' => $images,
+            'min_quantity' => $validated['min_quantity'] ?? 1,
+            'max_quantity' => $validated['max_quantity'] ?? null,
+            'images' => $validated['images'] ?? [],
+            'tags' => $validated['tags'] ?? [],
+            'variants' => $validated['variants'] ?? null,
+            'delivery_method' => $validated['delivery_method'] ?? null,
+            'delivery_time' => $validated['delivery_time'] ?? null,
+            'requirements' => $validated['requirements'] ?? null,
+            'warranty_days' => $validated['warranty_days'] ?? 0,
+            'refund_policy' => $validated['refund_policy'] ?? null,
+            'seo_title' => $validated['seo_title'] ?? null,
+            'seo_description' => $validated['seo_description'] ?? null,
+            'auto_deactivate' => $validated['auto_deactivate'] ?? false,
+            'is_featured' => $validated['is_featured'] ?? false,
+            'featured_until' => $validated['featured_until'] ?? null,
             'is_active' => true,
         ]);
 

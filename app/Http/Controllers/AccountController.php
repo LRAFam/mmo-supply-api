@@ -65,21 +65,30 @@ class AccountController extends Controller
             'title' => 'required|string|max:255',
             'description' => 'required|string',
             'price' => 'required|numeric|min:0',
-            'image_url' => 'nullable|string',
-            'images' => 'nullable|string',
-            'level' => 'nullable|string',
+            'discount_price' => 'nullable|numeric|min:0',
+            'images' => 'nullable|array',
+            'images.*' => 'string',
+            'tags' => 'nullable|array',
+            'tags.*' => 'string',
+            'account_level' => 'nullable|string',
             'rank' => 'nullable|string',
+            'server_region' => 'nullable|string',
+            'email_included' => 'nullable|boolean',
+            'email_changeable' => 'nullable|boolean',
+            'account_age_days' => 'nullable|integer|min:0',
+            'included_items' => 'nullable|array',
+            'included_items.*' => 'string',
+            'account_stats' => 'nullable|array',
+            'delivery_method' => 'nullable|string',
+            'requirements' => 'nullable|string',
+            'warranty_days' => 'nullable|integer|min:0',
+            'refund_policy' => 'nullable|string',
+            'seo_title' => 'nullable|string|max:255',
+            'seo_description' => 'nullable|string|max:500',
+            'auto_deactivate' => 'nullable|boolean',
+            'is_featured' => 'nullable|boolean',
+            'featured_until' => 'nullable|date',
         ]);
-
-        // Prepare images array
-        $images = [];
-        if (!empty($validated['image_url'])) {
-            $images[] = $validated['image_url'];
-        }
-        if (!empty($validated['images'])) {
-            $additionalImages = explode(',', $validated['images']);
-            $images = array_merge($images, $additionalImages);
-        }
 
         $account = Account::create([
             'user_id' => $request->user()->id,
@@ -88,11 +97,25 @@ class AccountController extends Controller
             'slug' => \Illuminate\Support\Str::slug($validated['title']) . '-' . uniqid(),
             'description' => $validated['description'],
             'price' => $validated['price'],
-            'images' => $images,
-            'account_level' => $validated['level'] ?? null,
-            'account_stats' => [
-                'rank' => $validated['rank'] ?? null,
-            ],
+            'discount_price' => $validated['discount_price'] ?? null,
+            'images' => $validated['images'] ?? [],
+            'tags' => $validated['tags'] ?? [],
+            'account_level' => $validated['account_level'] ?? null,
+            'rank' => $validated['rank'] ?? null,
+            'server_region' => $validated['server_region'] ?? null,
+            'email_included' => $validated['email_included'] ?? false,
+            'email_changeable' => $validated['email_changeable'] ?? false,
+            'account_age_days' => $validated['account_age_days'] ?? null,
+            'included_items' => $validated['included_items'] ?? [],
+            'account_stats' => $validated['account_stats'] ?? null,
+            'warranty_days' => $validated['warranty_days'] ?? 0,
+            'refund_policy' => $validated['refund_policy'] ?? null,
+            'requirements' => $validated['requirements'] ?? null,
+            'seo_title' => $validated['seo_title'] ?? null,
+            'seo_description' => $validated['seo_description'] ?? null,
+            'auto_deactivate' => $validated['auto_deactivate'] ?? false,
+            'is_featured' => $validated['is_featured'] ?? false,
+            'featured_until' => $validated['featured_until'] ?? null,
             'stock' => 1, // Single account
             'is_active' => true,
         ]);
