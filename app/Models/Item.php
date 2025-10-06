@@ -61,7 +61,14 @@ class Item extends Model
     {
         return Attribute::make(
             get: fn () => is_array($this->images) && !empty($this->images)
-                ? array_map(fn($img) => Storage::disk('s3')->temporaryUrl($img, now()->addHours(24)), $this->images)
+                ? array_map(function($img) {
+                    // If already a full URL, return as is
+                    if (str_starts_with($img, 'http://') || str_starts_with($img, 'https://')) {
+                        return $img;
+                    }
+                    // Otherwise generate temporary URL
+                    return Storage::disk('s3')->temporaryUrl($img, now()->addHours(24));
+                }, $this->images)
                 : [],
         );
     }
