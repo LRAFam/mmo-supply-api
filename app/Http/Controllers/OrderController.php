@@ -256,20 +256,20 @@ class OrderController extends Controller
             $orderItem->delivery_details = $request->delivery_details;
             $orderItem->status = 'delivered';
             $orderItem->delivered_at = now();
-            $orderItem->save();
 
-            // Release payment to seller
+            // Determine if seller is trusted for instant fund release
             $seller = $request->user();
-            $feePercentage = $seller->getPlatformFeePercentage();
-            $platformFee = $orderItem->total * ($feePercentage / 100);
-            $sellerEarnings = $orderItem->total - $platformFee;
+            $isTrustedSeller = $this->isSellerTrusted($seller);
 
-            // Credit seller wallet with earnings after platform fee
-            $sellerWallet = $seller->getOrCreateWallet();
-            $sellerWallet->receiveSale($sellerEarnings, $order->id);
+            if ($isTrustedSeller) {
+                // Trusted sellers get instant fund release
+                $this->releaseFundsToSeller($seller, $orderItem, $order->id);
+            } else {
+                // Untrusted sellers: require buyer confirmation or auto-release after 72 hours
+                $orderItem->auto_release_at = now()->addHours(72);
+            }
 
-            // Track sale for tier progression
-            $seller->addSale($orderItem->total);
+            $orderItem->save();
 
             // Check if all items are delivered and update order status
             $allDelivered = $order->items()->where('status', '!=', 'delivered')->count() === 0;
@@ -306,6 +306,128 @@ class OrderController extends Controller
             DB::rollBack();
             return response()->json(['error' => 'Failed to deliver item: ' . $e->getMessage()], 500);
         }
+    }
+
+    public function confirmDelivery(Request $request, $orderId, $itemId): JsonResponse
+    {
+        $request->validate([
+            'confirmed' => 'required|boolean',
+            'notes' => 'nullable|string|max:500',
+        ]);
+
+        try {
+            DB::beginTransaction();
+
+            $order = Order::findOrFail($orderId);
+            $orderItem = OrderItem::where('id', $itemId)
+                ->where('order_id', $orderId)
+                ->firstOrFail();
+
+            // Check if user is the buyer
+            if ($order->user_id !== $request->user()->id) {
+                return response()->json(['error' => 'Unauthorized'], 403);
+            }
+
+            // Check if item is delivered
+            if ($orderItem->status !== 'delivered') {
+                return response()->json(['error' => 'Item not yet delivered'], 400);
+            }
+
+            // Check if already confirmed
+            if ($orderItem->buyer_confirmed) {
+                return response()->json(['error' => 'Item already confirmed'], 400);
+            }
+
+            // Update confirmation status
+            $orderItem->buyer_confirmed = $request->confirmed;
+            $orderItem->buyer_confirmed_at = now();
+            $orderItem->buyer_confirmation_notes = $request->notes;
+
+            // If confirmed, release funds to seller
+            if ($request->confirmed && !$orderItem->funds_released) {
+                $seller = $orderItem->seller;
+                $this->releaseFundsToSeller($seller, $orderItem, $order->id);
+            }
+
+            $orderItem->save();
+
+            DB::commit();
+
+            return response()->json([
+                'message' => 'Delivery confirmation recorded successfully',
+                'order_item' => $orderItem,
+            ]);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json(['error' => 'Failed to confirm delivery: ' . $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Check if seller is trusted for instant fund release
+     */
+    private function isSellerTrusted($seller): bool
+    {
+        // Trusted criteria:
+        // 1. Premium or verified seller tier
+        // 2. OR has completed 50+ orders
+        // 3. OR lifetime sales > $5000
+        // 4. OR partner/elite subscription tier
+
+        $trustedTiers = ['premium', 'verified', 'partner', 'elite'];
+
+        if (in_array($seller->seller_tier, $trustedTiers)) {
+            return true;
+        }
+
+        if ($seller->subscription_tier && in_array($seller->subscription_tier, ['premium', 'elite'])) {
+            return true;
+        }
+
+        // Check completed orders count
+        $completedOrders = \DB::table('order_items')
+            ->where('seller_id', $seller->id)
+            ->whereIn('status', ['completed', 'delivered'])
+            ->count();
+
+        if ($completedOrders >= 50) {
+            return true;
+        }
+
+        // Check lifetime sales
+        if ($seller->total_sales >= 5000) {
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * Release funds to seller
+     */
+    private function releaseFundsToSeller($seller, $orderItem, $orderId): void
+    {
+        // Prevent double release
+        if ($orderItem->funds_released) {
+            return;
+        }
+
+        $feePercentage = $seller->getPlatformFeePercentage();
+        $platformFee = $orderItem->total * ($feePercentage / 100);
+        $sellerEarnings = $orderItem->total - $platformFee;
+
+        // Credit seller wallet with earnings after platform fee
+        $sellerWallet = $seller->getOrCreateWallet();
+        $sellerWallet->receiveSale($sellerEarnings, $orderId);
+
+        // Track sale for tier progression
+        $seller->addSale($orderItem->total);
+
+        // Mark funds as released
+        $orderItem->funds_released = true;
+        $orderItem->funds_released_at = now();
+        $orderItem->save();
     }
 
     public function updateStatus(Request $request, $id): JsonResponse

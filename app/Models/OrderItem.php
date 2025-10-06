@@ -28,6 +28,13 @@ class OrderItem extends Model
         'status',
         'delivery_details',
         'delivered_at',
+        'buyer_confirmed',
+        'buyer_confirmed_at',
+        'buyer_confirmation_notes',
+        'auto_release_at',
+        'auto_released',
+        'funds_released',
+        'funds_released_at',
     ];
 
     protected $casts = [
@@ -35,7 +42,13 @@ class OrderItem extends Model
         'discount' => 'decimal:2',
         'total' => 'decimal:2',
         'delivered_at' => 'datetime',
+        'buyer_confirmed_at' => 'datetime',
+        'auto_release_at' => 'datetime',
+        'funds_released_at' => 'datetime',
         'product_images' => 'array',
+        'buyer_confirmed' => 'boolean',
+        'auto_released' => 'boolean',
+        'funds_released' => 'boolean',
     ];
 
     public function order(): BelongsTo

@@ -102,6 +102,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/orders', [OrderController::class, 'store']);
     Route::put('/orders/{id}/status', [OrderController::class, 'updateStatus']);
     Route::post('/orders/{orderId}/items/{itemId}/deliver', [OrderController::class, 'deliverItem']);
+    Route::post('/orders/{orderId}/items/{itemId}/confirm-delivery', [OrderController::class, 'confirmDelivery']);
 
     // Reviews
     Route::post('/reviews', [ReviewController::class, 'store']);
