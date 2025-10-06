@@ -14,9 +14,12 @@ class ItemController extends Controller
             ->where('is_active', true)
             ->where('stock', '>', 0);
 
-        // Search by name
+        // Search by title or name
         if ($request->has('search')) {
-            $query->where('name', 'like', '%' . $request->search . '%');
+            $query->where(function($q) use ($request) {
+                $q->where('title', 'like', '%' . $request->search . '%')
+                  ->orWhere('name', 'like', '%' . $request->search . '%');
+            });
         }
 
         // Filter by game
