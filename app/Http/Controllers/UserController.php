@@ -105,4 +105,48 @@ class UserController extends Controller
             'created_at' => $user->created_at,
         ]);
     }
+
+    /**
+     * Allow a user to become a seller/provider
+     */
+    public function becomeSeller(Request $request): JsonResponse
+    {
+        $user = $request->user();
+
+        // Check if user is already a seller
+        if ($user->is_seller) {
+            return response()->json([
+                'error' => 'You are already a seller'
+            ], 400);
+        }
+
+        // Optional: validate requirements
+        $validated = $request->validate([
+            'agree_to_terms' => 'required|boolean|accepted',
+        ]);
+
+        // Update user to seller status
+        $user->update([
+            'is_seller' => true,
+            'seller_tier' => 'standard',
+        ]);
+
+        // Log the action
+        \Log::info('User became seller', [
+            'user_id' => $user->id,
+            'user_name' => $user->name,
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Congratulations! You are now a seller. Start creating your first listing.',
+            'user' => [
+                'id' => $user->id,
+                'name' => $user->name,
+                'is_seller' => true,
+                'seller_tier' => $user->seller_tier,
+                'seller_earnings_percentage' => $user->getSellerEarningsPercentage(),
+            ],
+        ], 201);
+    }
 }

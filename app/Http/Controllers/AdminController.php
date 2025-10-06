@@ -93,4 +93,83 @@ class AdminController extends Controller
             ],
         ]);
     }
+
+    /**
+     * Grant a temporary subscription to a user (admin only)
+     * Useful for promotions, support, testing, or special cases
+     */
+    public function grantSubscription(Request $request, $userId): JsonResponse
+    {
+        // TODO: Add admin middleware check
+
+        $request->validate([
+            'tier' => 'required|in:premium,elite',
+            'duration_days' => 'required|integer|min:1|max:365',
+            'reason' => 'nullable|string',
+        ]);
+
+        $user = User::findOrFail($userId);
+        $tier = $request->tier;
+        $durationDays = $request->duration_days;
+
+        // Check if user already has an active paid subscription
+        $existingSubscription = $user->subscriptions()->where('stripe_status', 'active')->first();
+        if ($existingSubscription) {
+            return response()->json([
+                'error' => 'User already has an active subscription. Please cancel it first.'
+            ], 400);
+        }
+
+        try {
+            // Ensure user is a Stripe customer
+            if (!$user->hasStripeId()) {
+                $user->createAsStripeCustomer([
+                    'name' => $user->name,
+                    'email' => $user->email,
+                ]);
+            }
+
+            // Get the Stripe price ID
+            $priceId = $tier === 'elite'
+                ? config('services.stripe.elite_price_id')
+                : config('services.stripe.premium_price_id');
+
+            // Create subscription with trial period (no payment required)
+            $subscription = $user->newSubscription('default', $priceId)
+                ->trialDays($durationDays)
+                ->create();
+
+            // Log the admin action
+            \Log::info('Admin granted subscription', [
+                'admin_user' => $request->user()->id ?? 'unknown',
+                'target_user' => $userId,
+                'tier' => $tier,
+                'duration_days' => $durationDays,
+                'reason' => $request->reason,
+            ]);
+
+            return response()->json([
+                'message' => "Successfully granted {$tier} subscription for {$durationDays} days",
+                'subscription' => [
+                    'id' => $subscription->id,
+                    'user_id' => $user->id,
+                    'tier' => $tier,
+                    'status' => $subscription->stripe_status,
+                    'trial_ends_at' => $subscription->trial_ends_at,
+                    'created_at' => $subscription->created_at,
+                ],
+            ], 201);
+
+        } catch (\Exception $e) {
+            \Log::error('Failed to grant subscription', [
+                'error' => $e->getMessage(),
+                'user_id' => $userId,
+                'tier' => $tier,
+            ]);
+
+            return response()->json([
+                'error' => 'Failed to grant subscription: ' . $e->getMessage()
+            ], 500);
+        }
+    }
 }

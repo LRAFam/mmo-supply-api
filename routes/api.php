@@ -65,6 +65,7 @@ Route::middleware(['auth:sanctum'])->prefix('users')->name('users.')->group(func
     Route::get('/me/stats', [UserStatsController::class, 'getUserStats'])->name('myStats');
     Route::get('/{user}', [UserController::class, 'show'])->name('show');
     Route::put('/edit', [UserController::class, 'edit'])->name('edit');
+    Route::post('/become-seller', [UserController::class, 'becomeSeller'])->name('becomeSeller');
 });
 
 Route::middleware(["auth:sanctum"])->prefix("stripe")->name("stripe.")->group(function () {
@@ -209,6 +210,7 @@ Route::middleware('auth:sanctum')->prefix('admin')->group(function () {
     Route::get('/sellers/custom-earnings', [AdminController::class, 'getCustomEarningsSellers']);
     Route::post('/sellers/{userId}/earnings', [AdminController::class, 'setSellerEarnings']);
     Route::delete('/sellers/{userId}/earnings', [AdminController::class, 'resetSellerEarnings']);
+    Route::post('/users/{userId}/grant-subscription', [AdminController::class, 'grantSubscription']);
 });
 
 Route::group(['prefix' => 'games'], function () {
