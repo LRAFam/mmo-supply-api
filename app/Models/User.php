@@ -29,9 +29,9 @@ class User extends Authenticatable implements FilamentUser
         'role',
         'is_seller',
         'wallet_balance',
+        'bonus_balance',
         'avatar',
         'bio',
-        'stripe_customer_id',
         'stripe_account_id',
         'stripe_onboarding_complete',
         'seller_earnings_percentage',
@@ -44,6 +44,12 @@ class User extends Authenticatable implements FilamentUser
         'referred_by',
         'total_referral_earnings',
         'total_referrals',
+        'last_login_ip',
+        'signup_ip',
+        'device_fingerprint',
+        'can_withdraw',
+        'withdrawal_eligible_at',
+        'total_purchases',
     ];
 
     /**
@@ -123,11 +129,6 @@ class User extends Authenticatable implements FilamentUser
     public function withdrawalRequests(): HasMany
     {
         return $this->hasMany(WithdrawalRequest::class);
-    }
-
-    public function sellerSubscription(): HasOne
-    {
-        return $this->hasOne(SellerSubscription::class);
     }
 
     public function featuredListings(): HasMany
@@ -220,30 +221,6 @@ class User extends Authenticatable implements FilamentUser
         ]);
     }
 
-    /**
-     * Get the active seller subscription or default to basic tier
-     */
-    public function getActiveSubscription(): SellerSubscription
-    {
-        $subscription = $this->sellerSubscription()
-            ->where('is_active', true)
-            ->where(function($query) {
-                $query->whereNull('expires_at')
-                      ->orWhere('expires_at', '>', now());
-            })
-            ->first();
-
-        // If no active subscription, return a basic tier default
-        if (!$subscription) {
-            return new SellerSubscription([
-                'tier' => 'basic',
-                'fee_percentage' => 30.00, // Platform gets 30%, creator gets 70%
-                'monthly_price' => 0,
-            ]);
-        }
-
-        return $subscription;
-    }
 
 
     /**
@@ -389,11 +366,11 @@ class User extends Authenticatable implements FilamentUser
      */
     public function getSubscriptionTier(): string
     {
-        if (!$this->subscribed('default')) {
-            return 'free';
-        }
+        // Get any active subscription
+        $subscription = $this->subscriptions()
+            ->where('stripe_status', 'active')
+            ->first();
 
-        $subscription = $this->subscription('default');
         if (!$subscription) {
             return 'free';
         }
@@ -504,5 +481,44 @@ class User extends Authenticatable implements FilamentUser
         }
 
         return $this->referral_code;
+    }
+
+    /**
+     * Get total balance (wallet + bonus)
+     */
+    public function getTotalBalance(): float
+    {
+        return floatval($this->wallet_balance) + floatval($this->bonus_balance);
+    }
+
+    /**
+     * Check if user can withdraw based on all security criteria
+     */
+    public function canWithdraw(): bool
+    {
+        return $this->can_withdraw
+            && ($this->withdrawal_eligible_at === null || now()->gte($this->withdrawal_eligible_at))
+            && $this->total_purchases > 0
+            && $this->email_verified_at !== null;
+    }
+
+    /**
+     * Get withdrawal eligibility status with details
+     */
+    public function getWithdrawalEligibility(): array
+    {
+        return [
+            'can_withdraw' => $this->canWithdraw(),
+            'checks' => [
+                'email_verified' => $this->email_verified_at !== null,
+                'withdrawals_enabled' => $this->can_withdraw,
+                'cooldown_passed' => $this->withdrawal_eligible_at === null || now()->gte($this->withdrawal_eligible_at),
+                'has_purchases' => $this->total_purchases > 0,
+            ],
+            'withdrawal_eligible_at' => $this->withdrawal_eligible_at,
+            'total_purchases' => $this->total_purchases,
+            'wallet_balance' => $this->wallet_balance,
+            'bonus_balance' => $this->bonus_balance,
+        ];
     }
 }

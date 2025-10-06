@@ -104,6 +104,14 @@ class SpinWheelController extends Controller
             return response()->json(['message' => 'Wheel not found or inactive'], 404);
         }
 
+        // SECURITY: Require email verification before spinning
+        if (!$user->email_verified_at) {
+            return response()->json([
+                'message' => 'Please verify your email before spinning',
+                'requires_verification' => true
+            ], 403);
+        }
+
         // Check if user can spin
         if (!$wheel->canUserSpin($user)) {
             $nextSpinTime = $wheel->getNextSpinTime($user);
@@ -173,26 +181,24 @@ class SpinWheelController extends Controller
             }
 
             // Award prize if wallet_credit
+            // SECURITY: Credit to bonus_balance (non-withdrawable) instead of wallet_balance
             if ($selectedPrize->type === 'wallet_credit' && $selectedPrize->value > 0) {
-                $user->increment('wallet_balance', $selectedPrize->value);
+                $user->increment('bonus_balance', $selectedPrize->value);
 
-                // Also update Wallet model
+                // Create transaction record in Wallet for tracking
                 $wallet = $user->wallet;
                 if ($wallet) {
-                    $wallet->increment('balance', $selectedPrize->value);
-
-                    // Create transaction record
                     $wallet->transactions()->create([
                         'user_id' => $user->id,
                         'type' => 'deposit',
                         'amount' => $selectedPrize->value,
                         'status' => 'completed',
-                        'description' => "Spin Wheel Prize: {$selectedPrize->name}",
+                        'description' => "Spin Wheel Bonus: {$selectedPrize->name} (Platform Credit Only)",
                     ]);
                 }
             }
 
-            // Create spin result record
+            // Create spin result record with IP tracking
             $spinResult = SpinResult::create([
                 'user_id' => $user->id,
                 'spin_wheel_id' => $wheel->id,
@@ -201,6 +207,7 @@ class SpinWheelController extends Controller
                 'prize_type' => $selectedPrize->type,
                 'prize_value' => $selectedPrize->value,
                 'spun_at' => now(),
+                'ip_address' => $request->ip(),
             ]);
 
             // Update or create user spin tracking for cooldown
@@ -231,7 +238,9 @@ class SpinWheelController extends Controller
                     'color' => $selectedPrize->color,
                     'icon' => $selectedPrize->icon,
                 ],
-                'new_wallet_balance' => $user->wallet_balance,
+                'wallet_balance' => $user->wallet_balance,
+                'bonus_balance' => $user->bonus_balance,
+                'total_balance' => $user->wallet_balance + $user->bonus_balance,
                 'next_spin_at' => $wheel->cost == 0 ? now()->addHours($wheel->cooldown_hours) : null,
             ];
 

@@ -69,21 +69,18 @@ class StripePaymentService
      */
     public function getOrCreateCustomer(User $user)
     {
-        if ($user->stripe_customer_id) {
-            return $user->stripe_customer_id;
+        // Use Cashier's method to ensure consistency
+        if (!$user->hasStripeId()) {
+            $user->createAsStripeCustomer([
+                'name' => $user->name,
+                'email' => $user->email,
+                'metadata' => [
+                    'user_id' => $user->id,
+                ],
+            ]);
         }
 
-        $customer = \Stripe\Customer::create([
-            'email' => $user->email,
-            'name' => $user->name,
-            'metadata' => [
-                'user_id' => $user->id,
-            ],
-        ]);
-
-        $user->update(['stripe_customer_id' => $customer->id]);
-
-        return $customer->id;
+        return $user->stripe_id;
     }
 
     /**

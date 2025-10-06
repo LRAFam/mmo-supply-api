@@ -127,10 +127,11 @@ class SubscriptionController extends Controller
         $user = $request->user();
         $tier = $request->tier;
 
-        // Check if user already has an active subscription to this tier
-        if ($user->subscribed($tier)) {
+        // Check if user already has an active subscription
+        $existingSubscription = $user->subscriptions()->where('stripe_status', 'active')->first();
+        if ($existingSubscription) {
             return response()->json([
-                'error' => 'You already have an active subscription to this plan.'
+                'error' => 'You already have an active subscription. Please cancel it first to change plans.'
             ], 400);
         }
 
@@ -148,8 +149,8 @@ class SubscriptionController extends Controller
                 ? config('services.stripe.elite_price_id')
                 : config('services.stripe.premium_price_id');
 
-            // Create subscription using Cashier
-            $subscription = $user->newSubscription($tier, $priceId)
+            // Create subscription using Cashier (always use 'default' as the name)
+            $subscription = $user->newSubscription('default', $priceId)
                 ->create($request->payment_method);
 
             return response()->json([
@@ -368,13 +369,16 @@ class SubscriptionController extends Controller
         $user = $request->user();
 
         try {
-            // Get all Cashier subscriptions
-            $subscriptions = $user->subscriptions()->get()->map(function ($subscription) {
+            // Get all Cashier subscriptions for this user only
+            $subscriptions = $user->subscriptions()
+                ->where('stripe_status', 'active')
+                ->get()
+                ->map(function ($subscription) {
                 // Determine tier from stripe_price
                 $tier = 'free';
-                if ($subscription->stripe_price === env('STRIPE_PRICE_PREMIUM')) {
+                if ($subscription->stripe_price === config('services.stripe.premium_price_id')) {
                     $tier = 'premium';
-                } elseif ($subscription->stripe_price === env('STRIPE_PRICE_ELITE')) {
+                } elseif ($subscription->stripe_price === config('services.stripe.elite_price_id')) {
                     $tier = 'elite';
                 }
 

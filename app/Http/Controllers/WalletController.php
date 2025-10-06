@@ -160,6 +160,58 @@ class WalletController extends Controller
         $user = $request->user();
         $wallet = $user->getOrCreateWallet();
 
+        // SECURITY: Email verification required
+        if (!$user->email_verified_at) {
+            return response()->json([
+                'message' => 'Please verify your email before withdrawing funds',
+                'requires_verification' => true
+            ], 403);
+        }
+
+        // SECURITY: Check if user can withdraw
+        if (!$user->can_withdraw) {
+            return response()->json([
+                'message' => 'Withdrawals are not enabled for your account. Make at least one purchase to enable withdrawals.',
+                'can_withdraw' => false
+            ], 403);
+        }
+
+        // SECURITY: Check withdrawal cooldown
+        if ($user->withdrawal_eligible_at && now()->lt($user->withdrawal_eligible_at)) {
+            return response()->json([
+                'message' => 'Withdrawal cooldown active. Please wait until the cooldown period ends.',
+                'eligible_at' => $user->withdrawal_eligible_at
+            ], 403);
+        }
+
+        // SECURITY: Require at least one purchase
+        if ($user->total_purchases < 1) {
+            return response()->json([
+                'message' => 'You must make at least one purchase before withdrawing funds',
+                'total_purchases' => $user->total_purchases
+            ], 403);
+        }
+
+        // SECURITY: Minimum withdrawal amount
+        $minWithdrawal = 10.00;
+        if ($request->amount < $minWithdrawal) {
+            return response()->json([
+                'message' => "Minimum withdrawal amount is $" . number_format($minWithdrawal, 2),
+                'minimum_amount' => $minWithdrawal
+            ], 400);
+        }
+
+        // SECURITY: Only allow withdrawing from wallet_balance (NOT bonus_balance)
+        if ($user->wallet_balance < $request->amount) {
+            return response()->json([
+                'message' => 'Insufficient withdrawable balance. Bonus credits cannot be withdrawn.',
+                'wallet_balance' => $user->wallet_balance,
+                'bonus_balance' => $user->bonus_balance,
+                'requested_amount' => $request->amount
+            ], 400);
+        }
+
+        // Check wallet available balance as well
         if ($wallet->available_balance < $request->amount) {
             return response()->json([
                 'message' => 'Insufficient balance',
@@ -169,6 +221,11 @@ class WalletController extends Controller
 
         try {
             DB::beginTransaction();
+
+            // SECURITY: Apply 5% withdrawal fee
+            $withdrawalFeePercent = 0.05;
+            $fee = $request->amount * $withdrawalFeePercent;
+            $netAmount = $request->amount - $fee;
 
             // Create withdrawal request
             $withdrawalRequest = $wallet->withdrawalRequests()->create([
@@ -180,7 +237,10 @@ class WalletController extends Controller
                 'status' => 'pending',
             ]);
 
-            // Hold the balance
+            // Deduct from user's wallet_balance immediately
+            $user->decrement('wallet_balance', $request->amount);
+
+            // Hold the balance in wallet
             $wallet->increment('pending_balance', $request->amount);
 
             DB::commit();
@@ -188,6 +248,10 @@ class WalletController extends Controller
             return response()->json([
                 'message' => 'Withdrawal request submitted successfully',
                 'withdrawal_request' => $withdrawalRequest,
+                'gross_amount' => $request->amount,
+                'fee' => $fee,
+                'fee_percent' => ($withdrawalFeePercent * 100) . '%',
+                'net_amount' => $netAmount,
                 'wallet' => $wallet->fresh(),
             ]);
         } catch (\Exception $e) {

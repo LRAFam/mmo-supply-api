@@ -105,7 +105,7 @@ class PaymentController extends Controller
     {
         $validator = Validator::make($request->all(), [
             'amount' => 'required|numeric|min:1',
-            'type' => 'required|string|in:wallet_deposit,order_payment,featured_listing,seller_subscription',
+            'type' => 'required|string|in:wallet_deposit,order_payment,featured_listing',
         ]);
 
         if ($validator->fails()) {
