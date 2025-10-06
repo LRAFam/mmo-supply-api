@@ -120,9 +120,11 @@ class UserController extends Controller
             ], 400);
         }
 
-        // Optional: validate requirements
+        // Validate requirements including game selection
         $validated = $request->validate([
             'agree_to_terms' => 'required|boolean|accepted',
+            'game_ids' => 'required|array|min:1',
+            'game_ids.*' => 'exists:games,id',
         ]);
 
         // Update user to seller status
@@ -131,10 +133,25 @@ class UserController extends Controller
             'seller_tier' => 'standard',
         ]);
 
+        // Create provider records for each selected game
+        foreach ($validated['game_ids'] as $gameId) {
+            \App\Models\Provider::firstOrCreate(
+                [
+                    'user_id' => $user->id,
+                    'game_id' => $gameId,
+                ],
+                [
+                    'vouches' => 0,
+                    'rating' => null,
+                ]
+            );
+        }
+
         // Log the action
         \Log::info('User became seller', [
             'user_id' => $user->id,
             'user_name' => $user->name,
+            'games' => $validated['game_ids'],
         ]);
 
         return response()->json([
