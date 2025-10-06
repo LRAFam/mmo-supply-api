@@ -52,7 +52,7 @@ class CurrencyController extends Controller
     {
         $validated = $request->validate([
             'game_id' => 'required|exists:games,id',
-            'name' => 'required|string|max:255',
+            'title' => 'required|string|max:255',
             'description' => 'required|string',
             'price' => 'required|numeric|min:0',
             'discount_price' => 'nullable|numeric|min:0',
@@ -79,8 +79,9 @@ class CurrencyController extends Controller
         $currency = Currency::create([
             'user_id' => $request->user()->id,
             'game_id' => $validated['game_id'],
-            'name' => $validated['name'],
-            'slug' => \Illuminate\Support\Str::slug($validated['name']) . '-' . uniqid(),
+            'title' => $validated['title'],
+            'name' => $validated['title'], // Keep name for compatibility
+            'slug' => \Illuminate\Support\Str::slug($validated['title']) . '-' . uniqid(),
             'description' => $validated['description'],
             'price_per_unit' => $validated['price'],
             'discount_price' => $validated['discount_price'] ?? null,

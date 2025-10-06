@@ -13,6 +13,7 @@ class Item extends Model
         'user_id',
         'game_id',
         'name',
+        'title',
         'slug',
         'description',
         'content',
