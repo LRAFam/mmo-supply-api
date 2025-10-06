@@ -22,3 +22,8 @@ Schedule::command('leaderboard:distribute-rewards monthly')
 Schedule::command('leaderboard:distribute-rewards weekly')
     ->weeklyOn(1, '00:00')
     ->timezone('UTC');
+
+// Auto-release funds to sellers after 72 hours if buyer hasn't confirmed delivery
+Schedule::command('orders:auto-release-funds')
+    ->hourly()
+    ->timezone('UTC');
