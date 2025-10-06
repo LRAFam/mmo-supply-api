@@ -87,6 +87,18 @@ class ItemController extends Controller
             'is_active' => true,
         ]);
 
+        // Create or update provider record for this user+game combination
+        \App\Models\Provider::firstOrCreate(
+            [
+                'user_id' => $request->user()->id,
+                'game_id' => $validated['game_id'],
+            ],
+            [
+                'vouches' => 0,
+                'rating' => null,
+            ]
+        );
+
         return response()->json($item, 201);
     }
 }
