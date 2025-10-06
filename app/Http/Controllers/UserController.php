@@ -142,7 +142,7 @@ class UserController extends Controller
                 ],
                 [
                     'vouches' => 0,
-                    'rating' => null,
+                    'rating' => 0,
                 ]
             );
         }
@@ -232,7 +232,7 @@ class UserController extends Controller
             'user_id' => $user->id,
             'game_id' => $validated['game_id'],
             'vouches' => 0,
-            'rating' => null,
+            'rating' => 0,
         ]);
 
         return response()->json([

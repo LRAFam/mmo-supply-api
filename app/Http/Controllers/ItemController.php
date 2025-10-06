@@ -95,7 +95,7 @@ class ItemController extends Controller
             ],
             [
                 'vouches' => 0,
-                'rating' => null,
+                'rating' => 0,
             ]
         );
 
