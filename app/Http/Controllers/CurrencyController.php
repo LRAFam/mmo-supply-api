@@ -119,7 +119,6 @@ class CurrencyController extends Controller
 
         return response()->json($currency, 201);
     }
-}
 
     public function update(Request $request, $id): JsonResponse
     {

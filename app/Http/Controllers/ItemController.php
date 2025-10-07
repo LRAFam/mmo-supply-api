@@ -125,7 +125,6 @@ class ItemController extends Controller
         );
 
         return response()->json($item, 201);
-    }
 }
 
     public function update(Request $request, $id): JsonResponse

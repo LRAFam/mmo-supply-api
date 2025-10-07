@@ -134,7 +134,6 @@ class AccountController extends Controller
 
         return response()->json($account, 201);
     }
-}
 
     public function update(Request $request, $id): JsonResponse
     {
