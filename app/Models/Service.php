@@ -12,6 +12,7 @@ class Service extends Model
     protected $fillable = [
         'user_id',
         'game_id',
+        'service_type',
         'title',
         'slug',
         'description',
@@ -28,6 +29,7 @@ class Service extends Model
         'tags',
         'packages',
         'addons',
+        'boosting_config',
         'requirements',
         'schedule',
         'max_concurrent_orders',
@@ -43,6 +45,7 @@ class Service extends Model
         'tags' => 'array',
         'packages' => 'array',
         'addons' => 'array',
+        'boosting_config' => 'array',
         'schedule' => 'array',
         'price' => 'decimal:2',
         'discount' => 'decimal:2',
