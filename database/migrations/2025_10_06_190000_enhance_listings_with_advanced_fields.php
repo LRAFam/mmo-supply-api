@@ -51,10 +51,10 @@ return new class extends Migration
                 $table->boolean('auto_deactivate')->default(false)->after('is_active');
             }
             if (!Schema::hasColumn('items', 'seo_title')) {
-                $table->string('seo_title')->nullable()->after('name');
+                $table->string('seo_title')->nullable();
             }
             if (!Schema::hasColumn('items', 'seo_description')) {
-                $table->text('seo_description')->nullable()->after('description');
+                $table->text('seo_description')->nullable();
             }
             if (!Schema::hasColumn('items', 'is_featured')) {
                 $table->boolean('is_featured')->default(false)->after('is_active');

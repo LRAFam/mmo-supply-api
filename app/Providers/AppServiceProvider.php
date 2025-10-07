@@ -35,5 +35,11 @@ class AppServiceProvider extends ServiceProvider
         Event::listen(function (SocialiteWasCalled $event) {
             $event->extendSocialite('discord', Provider::class);
         });
+
+        // Register observers for Discord webhooks
+        \App\Models\Item::observe(\App\Observers\ItemObserver::class);
+        \App\Models\Currency::observe(\App\Observers\CurrencyObserver::class);
+        \App\Models\Account::observe(\App\Observers\AccountObserver::class);
+        \App\Models\Service::observe(\App\Observers\ServiceObserver::class);
     }
 }
