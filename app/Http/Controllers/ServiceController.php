@@ -58,7 +58,7 @@ class ServiceController extends Controller
             'game_id' => 'required|exists:games,id',
             'title' => 'required|string|max:255',
             'description' => 'required|string',
-            'price' => 'required|numeric|min:0',
+            'price' => 'nullable|numeric|min:0',
             'discount_price' => 'nullable|numeric|min:0',
             'estimated_time' => 'nullable|string',
             'images' => 'nullable|array',
@@ -78,6 +78,8 @@ class ServiceController extends Controller
             'auto_deactivate' => 'nullable|boolean',
             'is_featured' => 'nullable|boolean',
             'featured_until' => 'nullable|date',
+            'service_type' => 'nullable|string',
+            'boosting_config' => 'nullable|array',
         ]);
 
         $service = Service::create([
@@ -86,7 +88,7 @@ class ServiceController extends Controller
             'title' => $validated['title'],
             'slug' => \Illuminate\Support\Str::slug($validated['title']) . '-' . uniqid(),
             'description' => $validated['description'],
-            'price' => $validated['price'],
+            'price' => $validated['price'] ?? 0,
             'discount_price' => $validated['discount_price'] ?? null,
             'estimated_time' => $validated['estimated_time'] ?? null,
             'images' => $validated['images'] ?? [],
@@ -104,6 +106,8 @@ class ServiceController extends Controller
             'auto_deactivate' => $validated['auto_deactivate'] ?? false,
             'is_featured' => $validated['is_featured'] ?? false,
             'featured_until' => $validated['featured_until'] ?? null,
+            'service_type' => $validated['service_type'] ?? 'standard',
+            'boosting_config' => $validated['boosting_config'] ?? null,
             'is_active' => true,
         ]);
 
