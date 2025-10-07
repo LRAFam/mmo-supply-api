@@ -127,3 +127,45 @@ class ItemController extends Controller
         return response()->json($item, 201);
     }
 }
+
+    public function update(Request $request, $id): JsonResponse
+    {
+        $item = \App\Models\Item::findOrFail($id);
+
+        // Ensure user owns this item
+        if ($item->user_id !== $request->user()->id) {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+
+        $validated = $request->validate([
+            'game_id' => 'sometimes|exists:games,id',
+            'name' => 'sometimes|string|max:255',
+            'description' => 'sometimes|string',
+            'content' => 'nullable|string',
+            'price' => 'nullable|numeric|min:0',
+            'discount' => 'nullable|numeric|min:0',
+            'stock' => 'nullable|integer|min:0',
+            'min_quantity' => 'nullable|integer|min:1',
+            'max_quantity' => 'nullable|integer|min:1',
+            'delivery_method' => 'nullable|string',
+            'delivery_time' => 'nullable|string',
+            'requirements' => 'nullable|string',
+            'warranty_days' => 'nullable|integer|min:0',
+            'refund_policy' => 'nullable|string',
+            'images' => 'nullable|array',
+            'images.*' => 'string',
+            'tags' => 'nullable|array',
+            'tags.*' => 'string',
+            'variants' => 'nullable|array',
+            'seo_title' => 'nullable|string|max:255',
+            'seo_description' => 'nullable|string|max:500',
+            'auto_deactivate' => 'nullable|boolean',
+            'is_featured' => 'nullable|boolean',
+            'featured_until' => 'nullable|date',
+        ]);
+
+        $item->update($validated);
+
+        return response()->json($item);
+    }
+}

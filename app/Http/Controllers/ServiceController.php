@@ -125,4 +125,47 @@ class ServiceController extends Controller
 
         return response()->json($service, 201);
     }
+
+    public function update(Request $request, $id): JsonResponse
+    {
+        $service = Service::findOrFail($id);
+
+        // Ensure user owns this service
+        if ($service->user_id !== $request->user()->id) {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+
+        $validated = $request->validate([
+            'game_id' => 'sometimes|exists:games,id',
+            'title' => 'sometimes|string|max:255',
+            'description' => 'sometimes|string',
+            'content' => 'nullable|string',
+            'price' => 'nullable|numeric|min:0',
+            'discount_price' => 'nullable|numeric|min:0',
+            'estimated_time' => 'nullable|string',
+            'images' => 'nullable|array',
+            'images.*' => 'string',
+            'tags' => 'nullable|array',
+            'tags.*' => 'string',
+            'packages' => 'nullable|array',
+            'addons' => 'nullable|array',
+            'schedule' => 'nullable|array',
+            'max_concurrent_orders' => 'nullable|integer|min:1',
+            'delivery_method' => 'nullable|string',
+            'requirements' => 'nullable|string',
+            'warranty_days' => 'nullable|integer|min:0',
+            'refund_policy' => 'nullable|string',
+            'seo_title' => 'nullable|string|max:255',
+            'seo_description' => 'nullable|string|max:500',
+            'auto_deactivate' => 'nullable|boolean',
+            'is_featured' => 'nullable|boolean',
+            'featured_until' => 'nullable|date',
+            'service_type' => 'nullable|string',
+            'boosting_config' => 'nullable|array',
+        ]);
+
+        $service->update($validated);
+
+        return response()->json($service);
+    }
 }

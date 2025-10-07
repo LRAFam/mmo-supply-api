@@ -135,3 +135,49 @@ class AccountController extends Controller
         return response()->json($account, 201);
     }
 }
+
+    public function update(Request $request, $id): JsonResponse
+    {
+        $account = \App\Models\Account::findOrFail($id);
+
+        // Ensure user owns this account
+        if ($account->user_id !== $request->user()->id) {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+
+        $validated = $request->validate([
+            'game_id' => 'sometimes|exists:games,id',
+            'title' => 'sometimes|string|max:255',
+            'description' => 'sometimes|string',
+            'content' => 'nullable|string',
+            'price' => 'nullable|numeric|min:0',
+            'discount' => 'nullable|numeric|min:0',
+            'account_level' => 'nullable|string',
+            'rank' => 'nullable|string',
+            'server_region' => 'nullable|string',
+            'email_included' => 'nullable|boolean',
+            'email_changeable' => 'nullable|boolean',
+            'account_age_days' => 'nullable|integer|min:0',
+            'included_items' => 'nullable|array',
+            'account_stats' => 'nullable|array',
+            'delivery_method' => 'nullable|string',
+            'delivery_time' => 'nullable|string',
+            'requirements' => 'nullable|string',
+            'warranty_days' => 'nullable|integer|min:0',
+            'refund_policy' => 'nullable|string',
+            'images' => 'nullable|array',
+            'images.*' => 'string',
+            'tags' => 'nullable|array',
+            'tags.*' => 'string',
+            'seo_title' => 'nullable|string|max:255',
+            'seo_description' => 'nullable|string|max:500',
+            'auto_deactivate' => 'nullable|boolean',
+            'is_featured' => 'nullable|boolean',
+            'featured_until' => 'nullable|date',
+        ]);
+
+        $account->update($validated);
+
+        return response()->json($account);
+    }
+}
