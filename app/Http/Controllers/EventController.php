@@ -20,6 +20,9 @@ class EventController extends Controller
         // Filter by status
         if ($request->has('status')) {
             $query->where('status', $request->status);
+        } else {
+            // Exclude draft events by default
+            $query->whereIn('status', ['active', 'upcoming', 'completed', 'cancelled']);
         }
 
         // Filter by type
