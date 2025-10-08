@@ -87,7 +87,7 @@ class EventSeeder extends Seeder
                 'ends_at' => now()->addMonths(3),
                 'status' => 'active',
                 'max_participants' => null,
-                'winner_count' => null,
+                'winner_count' => 0,
                 'prizes' => [
                     ['rank' => 'all', 'description' => '$5 Bonus Credits on First $25+ Purchase', 'wallet_amount' => 5.00],
                 ],
