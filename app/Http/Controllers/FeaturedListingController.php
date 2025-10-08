@@ -27,6 +27,20 @@ class FeaturedListingController extends Controller
             ->orderBy('created_at', 'desc')
             ->get();
 
+        // Enhance with actual product details
+        $listings = $listings->map(function($listing) {
+            $productClass = $listing->product_type;
+            if (class_exists($productClass)) {
+                $product = $productClass::find($listing->product_id);
+                if ($product) {
+                    $listing->product_name = $product->name ?? $product->title ?? 'Unknown';
+                    $listing->product_price = $product->price ?? $product->price_per_unit ?? 0;
+                    $listing->product_image = $product->images[0] ?? null;
+                }
+            }
+            return $listing;
+        });
+
         return response()->json($listings);
     }
 
