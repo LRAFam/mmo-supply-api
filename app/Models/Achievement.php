@@ -16,6 +16,7 @@ class Achievement extends Model
         'achievement_group',
         'description',
         'icon',
+        'badge_icon',
         'category',
         'tier',
         'level',
@@ -25,12 +26,17 @@ class Achievement extends Model
         'requirements',
         'is_active',
         'is_secret',
+        'season_id',
+        'is_seasonal',
+        'grants_badge',
     ];
 
     protected $casts = [
         'requirements' => 'array',
         'is_active' => 'boolean',
         'is_secret' => 'boolean',
+        'is_seasonal' => 'boolean',
+        'grants_badge' => 'boolean',
         'wallet_reward' => 'decimal:2',
     ];
 
@@ -42,6 +48,14 @@ class Achievement extends Model
         return $this->belongsToMany(User::class, 'user_achievements')
             ->withPivot('unlocked_at', 'is_notified', 'progress_data', 'reward_claimed', 'reward_claimed_at')
             ->withTimestamps();
+    }
+
+    /**
+     * Season this achievement belongs to
+     */
+    public function season()
+    {
+        return $this->belongsTo(Season::class);
     }
 
     /**
@@ -106,6 +120,19 @@ class Achievement extends Model
             return false; // Reward already claimed
         }
 
+        // Check if user has a valid season pass for this achievement
+        $seasonPass = null;
+        if ($this->season_id) {
+            $seasonPass = $user->seasonPasses()
+                ->where('season_id', $this->season_id)
+                ->where('is_active', true)
+                ->first();
+
+            if (!$seasonPass) {
+                return false; // No active season pass
+            }
+        }
+
         DB::beginTransaction();
         try {
             // Mark reward as claimed
@@ -114,29 +141,46 @@ class Achievement extends Model
                 'reward_claimed_at' => now(),
             ]);
 
-            // Award wallet balance to both users table and wallets table
-            if ($this->wallet_reward > 0) {
-                $user->increment('wallet_balance', $this->wallet_reward);
+            // Calculate cash reward based on season pass tier
+            $cashReward = 0;
+            if ($this->wallet_reward > 0 && $seasonPass) {
+                $cashReward = $seasonPass->calculateReward($this->wallet_reward);
 
-                // Also update the Wallet model balance
-                $wallet = $user->wallet;
-                if ($wallet) {
-                    $wallet->increment('balance', $this->wallet_reward);
+                if ($cashReward > 0) {
+                    $user->increment('wallet_balance', $cashReward);
 
-                    // Create transaction record
-                    $wallet->transactions()->create([
-                        'user_id' => $user->id,
-                        'type' => 'achievement',
-                        'amount' => $this->wallet_reward,
-                        'status' => 'completed',
-                        'description' => "Achievement reward: {$this->name}",
-                    ]);
+                    // Also update the Wallet model balance
+                    $wallet = $user->wallet;
+                    if ($wallet) {
+                        $wallet->increment('balance', $cashReward);
+
+                        // Create transaction record
+                        $wallet->transactions()->create([
+                            'user_id' => $user->id,
+                            'type' => 'achievement',
+                            'amount' => $cashReward,
+                            'status' => 'completed',
+                            'description' => "Achievement reward: {$this->name} ({$seasonPass->getTierDisplayName()} Pass)",
+                        ]);
+                    }
                 }
             }
 
-            // Award points if applicable
-            if ($this->points > 0 && method_exists($user, 'hasAttribute') && $user->hasAttribute('achievement_points')) {
-                $user->increment('achievement_points', $this->points);
+            // Award achievement points (all users get points, regardless of pass tier)
+            $pointsToAward = $this->points;
+            if (!$pointsToAward && $this->tier) {
+                // Fallback to config if not set on achievement
+                $pointValues = config('achievements.point_values', []);
+                $pointsToAward = $pointValues[$this->tier] ?? 0;
+            }
+
+            if ($pointsToAward > 0) {
+                $user->increment('achievement_points', $pointsToAward);
+            }
+
+            // Grant badge if this is a badge-granting achievement
+            if ($this->grants_badge && $this->badge_icon) {
+                $user->addBadge($this->slug, $this->badge_icon, $this->name);
             }
 
             DB::commit();

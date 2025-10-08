@@ -50,6 +50,11 @@ class User extends Authenticatable implements FilamentUser
         'can_withdraw',
         'withdrawal_eligible_at',
         'total_purchases',
+        'achievement_points',
+        'owned_cosmetics',
+        'badge_inventory',
+        'active_profile_theme',
+        'active_title',
     ];
 
     /**
@@ -73,6 +78,8 @@ class User extends Authenticatable implements FilamentUser
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
             'is_seller' => 'boolean',
+            'owned_cosmetics' => 'array',
+            'badge_inventory' => 'array',
         ];
     }
 
@@ -162,6 +169,30 @@ class User extends Authenticatable implements FilamentUser
     public function seasonParticipations()
     {
         return $this->hasMany(UserSeasonParticipation::class);
+    }
+
+    /**
+     * Season passes relationship
+     */
+    public function seasonPasses()
+    {
+        return $this->hasMany(UserSeasonPass::class);
+    }
+
+    /**
+     * Active perks relationship
+     */
+    public function activePerks()
+    {
+        return $this->hasMany(UserActivePerk::class);
+    }
+
+    /**
+     * Store purchases relationship
+     */
+    public function storePurchases()
+    {
+        return $this->hasMany(UserStorePurchase::class);
     }
 
     /**
@@ -520,5 +551,230 @@ class User extends Authenticatable implements FilamentUser
             'wallet_balance' => $this->wallet_balance,
             'bonus_balance' => $this->bonus_balance,
         ];
+    }
+
+    // ============================================================
+    // Achievement Points & Store Methods
+    // ============================================================
+
+    /**
+     * Add cosmetic item to user's inventory
+     */
+    public function addCosmetic(string $slug, string $category): bool
+    {
+        $cosmetics = $this->owned_cosmetics ?? [];
+
+        // Check if already owned
+        if (isset($cosmetics[$category]) && in_array($slug, $cosmetics[$category])) {
+            return false;
+        }
+
+        // Add to inventory
+        if (!isset($cosmetics[$category])) {
+            $cosmetics[$category] = [];
+        }
+        $cosmetics[$category][] = $slug;
+
+        $this->update(['owned_cosmetics' => $cosmetics]);
+        return true;
+    }
+
+    /**
+     * Check if user owns a cosmetic item
+     */
+    public function ownsCosmetic(string $slug): bool
+    {
+        $cosmetics = $this->owned_cosmetics ?? [];
+
+        foreach ($cosmetics as $category => $items) {
+            if (in_array($slug, $items)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Add badge to user's inventory
+     */
+    public function addBadge(string $slug, string $icon, string $name): bool
+    {
+        $badges = $this->badge_inventory ?? [];
+
+        // Check if already owned
+        foreach ($badges as $badge) {
+            if ($badge['slug'] === $slug) {
+                return false;
+            }
+        }
+
+        // Add badge
+        $badges[] = [
+            'slug' => $slug,
+            'icon' => $icon,
+            'name' => $name,
+            'earned_at' => now()->toDateTimeString(),
+        ];
+
+        $this->update(['badge_inventory' => $badges]);
+        return true;
+    }
+
+    /**
+     * Get usage count for a store item
+     */
+    public function getItemUsageCount(string $itemSlug): int
+    {
+        $item = AchievementStoreItem::where('slug', $itemSlug)->first();
+        if (!$item) {
+            return 0;
+        }
+
+        return $this->storePurchases()
+            ->where('store_item_id', $item->id)
+            ->sum('times_used');
+    }
+
+    /**
+     * Get last used date for a store item
+     */
+    public function getItemLastUsed(string $itemSlug)
+    {
+        $item = AchievementStoreItem::where('slug', $itemSlug)->first();
+        if (!$item) {
+            return null;
+        }
+
+        $purchase = $this->storePurchases()
+            ->where('store_item_id', $item->id)
+            ->whereNotNull('used_at')
+            ->orderBy('used_at', 'desc')
+            ->first();
+
+        return $purchase ? $purchase->used_at : null;
+    }
+
+    /**
+     * Apply marketplace perk to user
+     */
+    public function applyMarketplacePerk(string $slug, ?array $metadata): bool
+    {
+        $item = AchievementStoreItem::where('slug', $slug)->first();
+        if (!$item) {
+            return false;
+        }
+
+        // Determine perk type and expiration based on slug
+        $perkType = $this->getPerkTypeFromSlug($slug);
+        $expiresAt = $this->calculatePerkExpiration($slug, $metadata);
+
+        // Create active perk
+        $this->activePerks()->create([
+            'store_item_id' => $item->id,
+            'perk_type' => $perkType,
+            'perk_data' => $metadata,
+            'activated_at' => now(),
+            'expires_at' => $expiresAt,
+            'is_active' => true,
+            'uses_remaining' => $item->max_uses,
+        ]);
+
+        return true;
+    }
+
+    /**
+     * Apply functional item to user
+     */
+    public function applyFunctionalItem(string $slug, ?array $metadata): bool
+    {
+        $item = AchievementStoreItem::where('slug', $slug)->first();
+        if (!$item) {
+            return false;
+        }
+
+        // For functional items, just record the purchase
+        // Actual functionality would be checked when needed
+        return true;
+    }
+
+    /**
+     * Get active perk of a specific type
+     */
+    public function getActivePerk(string $perkType)
+    {
+        return $this->activePerks()
+            ->active()
+            ->where('perk_type', $perkType)
+            ->orderBy('created_at', 'desc')
+            ->first();
+    }
+
+    /**
+     * Check if user has an active perk of a specific type
+     */
+    public function hasActivePerk(string $perkType): bool
+    {
+        return $this->activePerks()
+            ->active()
+            ->where('perk_type', $perkType)
+            ->exists();
+    }
+
+    /**
+     * Get perk type from item slug
+     */
+    private function getPerkTypeFromSlug(string $slug): string
+    {
+        if (str_contains($slug, 'listing_boost')) {
+            return 'listing_boost';
+        }
+        if (str_contains($slug, 'featured_discount')) {
+            return 'featured_discount';
+        }
+        if (str_contains($slug, 'commission_reduction')) {
+            return 'commission_reduction';
+        }
+        return 'generic';
+    }
+
+    /**
+     * Calculate perk expiration based on duration
+     */
+    private function calculatePerkExpiration(string $slug, ?array $metadata)
+    {
+        // Extract duration from slug or metadata
+        if (str_contains($slug, '24h')) {
+            return now()->addHours(24);
+        }
+        if (str_contains($slug, '72h')) {
+            return now()->addHours(72);
+        }
+        if (str_contains($slug, 'week')) {
+            return now()->addWeek();
+        }
+        if (str_contains($slug, 'day') && !str_contains($slug, 'days')) {
+            return now()->addDay();
+        }
+        if (str_contains($slug, 'month')) {
+            return now()->addMonth();
+        }
+
+        // Default to metadata or 7 days
+        return $metadata['expires_at'] ?? now()->addDays(7);
+    }
+
+    /**
+     * Get active season pass for user
+     */
+    public function getActiveSeasonPass($seasonId = null)
+    {
+        $query = $this->seasonPasses()->where('is_active', true);
+
+        if ($seasonId) {
+            $query->where('season_id', $seasonId);
+        }
+
+        return $query->first();
     }
 }

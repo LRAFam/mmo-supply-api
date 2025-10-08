@@ -18,13 +18,19 @@ class Season extends Model
         'status',
         'prize_pool',
         'features',
+        'pass_revenue',
+        'rewards_paid',
+        'is_active',
     ];
 
     protected $casts = [
         'start_date' => 'datetime',
         'end_date' => 'datetime',
         'prize_pool' => 'decimal:2',
+        'pass_revenue' => 'decimal:2',
+        'rewards_paid' => 'decimal:2',
         'features' => 'array',
+        'is_active' => 'boolean',
     ];
 
     /**
@@ -49,6 +55,14 @@ class Season extends Model
     public function achievements()
     {
         return $this->hasMany(Achievement::class);
+    }
+
+    /**
+     * Get season passes
+     */
+    public function seasonPasses()
+    {
+        return $this->hasMany(UserSeasonPass::class);
     }
 
     /**
@@ -125,5 +139,95 @@ class Season extends Model
         }
 
         return max(0, now()->diffInDays($this->end_date, false));
+    }
+
+    /**
+     * Calculate current rewards pool (15% of pass revenue)
+     */
+    public function calculateRewardsPool(): float
+    {
+        $rewardsPercentage = config('achievements.rewards_pool_percentage', 0.15);
+        return round($this->pass_revenue * $rewardsPercentage, 2);
+    }
+
+    /**
+     * Get remaining rewards pool
+     */
+    public function getRemainingRewardsPool(): float
+    {
+        $totalPool = $this->calculateRewardsPool();
+        return max(0, $totalPool - $this->rewards_paid);
+    }
+
+    /**
+     * Check if season has met minimum requirements for cash rewards
+     */
+    public function canPayCashRewards(): bool
+    {
+        $minimums = config('achievements.minimums', []);
+        $minPool = $minimums['season_pool'] ?? 100.00;
+        $minSales = $minimums['pass_sales_required'] ?? 20;
+
+        $totalPool = $this->calculateRewardsPool();
+        $passSales = $this->seasonPasses()->count();
+
+        return $totalPool >= $minPool && $passSales >= $minSales;
+    }
+
+    /**
+     * Record pass purchase
+     */
+    public function recordPassPurchase(float $amount): void
+    {
+        $this->increment('pass_revenue', $amount);
+
+        // Update prize pool (total revenue tracked)
+        $this->increment('prize_pool', $amount);
+    }
+
+    /**
+     * Record reward payment
+     */
+    public function recordRewardPayment(float $amount): void
+    {
+        $this->increment('rewards_paid', $amount);
+    }
+
+    /**
+     * Get pass tier pricing
+     */
+    public function getPassPricing(): array
+    {
+        return config('achievements.pass_prices', [
+            'free' => 0.00,
+            'basic' => 4.99,
+            'premium' => 9.99,
+            'elite' => 19.99,
+        ]);
+    }
+
+    /**
+     * Calculate dynamic reward for an achievement
+     */
+    public function calculateAchievementReward(Achievement $achievement, int $completionCount): float
+    {
+        if (!$this->canPayCashRewards()) {
+            return 0.0;
+        }
+
+        $totalPool = $this->calculateRewardsPool();
+        $percentages = config('achievements.base_reward_percentages', []);
+        $tierPercentage = $percentages[$achievement->tier] ?? 0.02;
+
+        // Calculate base reward: (pool * tier percentage) / number of completions
+        $baseReward = ($totalPool * $tierPercentage) / max(1, $completionCount);
+
+        // Apply minimum threshold
+        $minReward = config('achievements.minimums.cash_reward', 0.10);
+        if ($baseReward > 0 && $baseReward < $minReward) {
+            return $minReward;
+        }
+
+        return round($baseReward, 2);
     }
 }
