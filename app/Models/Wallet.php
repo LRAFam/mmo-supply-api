@@ -75,7 +75,7 @@ class Wallet extends Model
         ]);
     }
 
-    public function purchase(float $amount, int $orderId, string $description = null): Transaction
+    public function purchase(float $amount, ?int $orderId = null, string $description = null): Transaction
     {
         if ($this->balance < $amount) {
             throw new \Exception('Insufficient balance');
