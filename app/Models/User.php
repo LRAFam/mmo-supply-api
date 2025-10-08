@@ -777,4 +777,41 @@ class User extends Authenticatable implements FilamentUser
 
         return $query->first();
     }
+
+    /**
+     * Get effective platform fee percentage with perks applied
+     */
+    public function getEffectivePlatformFee(float $baseFee = 10.00): float
+    {
+        $effectiveFee = $baseFee;
+
+        // Check for commission reduction perk
+        $commissionPerk = $this->getActivePerk('commission_reduction');
+        if ($commissionPerk && $commissionPerk->perk_data) {
+            $reduction = $commissionPerk->perk_data['commission_reduction'] ?? 0;
+            $effectiveFee = max(5.0, $baseFee - $reduction); // Min 5% fee
+        }
+
+        return $effectiveFee;
+    }
+
+    /**
+     * Check if user has listing boost active
+     */
+    public function hasListingBoost(): bool
+    {
+        return $this->hasActivePerk('listing_boost');
+    }
+
+    /**
+     * Get listing boost multiplier
+     */
+    public function getListingBoostMultiplier(): float
+    {
+        $boostPerk = $this->getActivePerk('listing_boost');
+        if ($boostPerk && $boostPerk->perk_data) {
+            return $boostPerk->perk_data['boost_multiplier'] ?? 1.0;
+        }
+        return 1.0;
+    }
 }

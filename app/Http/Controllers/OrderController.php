@@ -413,7 +413,9 @@ class OrderController extends Controller
             return;
         }
 
-        $feePercentage = $seller->getPlatformFeePercentage();
+        // Get effective platform fee with perks applied
+        $baseFeePercentage = $seller->getPlatformFeePercentage();
+        $feePercentage = $seller->getEffectivePlatformFee($baseFeePercentage);
         $platformFee = $orderItem->total * ($feePercentage / 100);
         $sellerEarnings = $orderItem->total - $platformFee;
 
