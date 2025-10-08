@@ -168,4 +168,18 @@ class ServiceController extends Controller
 
         return response()->json($service);
     }
+
+    public function destroy(Request $request, $id): JsonResponse
+    {
+        $service = Service::findOrFail($id);
+
+        // Ensure user owns this service
+        if ($service->user_id !== $request->user()->id) {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+
+        $service->delete();
+
+        return response()->json(['message' => 'Service deleted successfully']);
+    }
 }

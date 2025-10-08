@@ -160,4 +160,18 @@ class CurrencyController extends Controller
 
         return response()->json($currency);
     }
+
+    public function destroy(Request $request, $id): JsonResponse
+    {
+        $currency = \App\Models\Currency::findOrFail($id);
+
+        // Ensure user owns this currency
+        if ($currency->user_id !== $request->user()->id) {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+
+        $currency->delete();
+
+        return response()->json(['message' => 'Currency deleted successfully']);
+    }
 }

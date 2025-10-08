@@ -179,4 +179,18 @@ class AccountController extends Controller
 
         return response()->json($account);
     }
+
+    public function destroy(Request $request, $id): JsonResponse
+    {
+        $account = \App\Models\Account::findOrFail($id);
+
+        // Ensure user owns this account
+        if ($account->user_id !== $request->user()->id) {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+
+        $account->delete();
+
+        return response()->json(['message' => 'Account deleted successfully']);
+    }
 }

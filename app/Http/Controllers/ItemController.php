@@ -167,4 +167,18 @@ class ItemController extends Controller
 
         return response()->json($item);
     }
+
+    public function destroy(Request $request, $id): JsonResponse
+    {
+        $item = \App\Models\Item::findOrFail($id);
+
+        // Ensure user owns this item
+        if ($item->user_id !== $request->user()->id) {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+
+        $item->delete();
+
+        return response()->json(['message' => 'Item deleted successfully']);
+    }
 }
