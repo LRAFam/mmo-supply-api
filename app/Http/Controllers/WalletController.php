@@ -30,9 +30,10 @@ class WalletController extends Controller
         return response()->json([
             'wallet' => $wallet,
             'available_balance' => $wallet->available_balance,
-            'user_wallet_balance' => $user->wallet_balance,
-            'user_bonus_balance' => $user->bonus_balance,
-            'total_balance' => $user->getTotalBalance(),
+            'wallet_balance' => floatval($wallet->balance),
+            'pending_balance' => floatval($wallet->pending_balance),
+            'bonus_balance' => floatval($user->bonus_balance ?? 0),
+            'total_balance' => floatval($wallet->balance) + floatval($user->bonus_balance ?? 0),
         ]);
     }
 
