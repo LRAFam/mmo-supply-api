@@ -12,10 +12,18 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('achievements', function (Blueprint $table) {
-            $table->foreignId('season_id')->nullable()->after('slug')->constrained()->onDelete('set null');
-            $table->string('badge_icon')->nullable()->after('icon');
-            $table->boolean('is_seasonal')->default(false)->after('is_active');
-            $table->boolean('grants_badge')->default(false)->after('is_seasonal');
+            if (!Schema::hasColumn('achievements', 'season_id')) {
+                $table->foreignId('season_id')->nullable()->after('slug')->constrained()->onDelete('set null');
+            }
+            if (!Schema::hasColumn('achievements', 'badge_icon')) {
+                $table->string('badge_icon')->nullable()->after('icon');
+            }
+            if (!Schema::hasColumn('achievements', 'is_seasonal')) {
+                $table->boolean('is_seasonal')->default(false)->after('is_active');
+            }
+            if (!Schema::hasColumn('achievements', 'grants_badge')) {
+                $table->boolean('grants_badge')->default(false)->after('is_seasonal');
+            }
         });
     }
 
@@ -25,8 +33,19 @@ return new class extends Migration
     public function down(): void
     {
         Schema::table('achievements', function (Blueprint $table) {
-            $table->dropForeign(['season_id']);
-            $table->dropColumn(['season_id', 'badge_icon', 'is_seasonal', 'grants_badge']);
+            if (Schema::hasColumn('achievements', 'season_id')) {
+                $table->dropForeign(['season_id']);
+            }
+
+            $columnsToDrop = [];
+            if (Schema::hasColumn('achievements', 'season_id')) $columnsToDrop[] = 'season_id';
+            if (Schema::hasColumn('achievements', 'badge_icon')) $columnsToDrop[] = 'badge_icon';
+            if (Schema::hasColumn('achievements', 'is_seasonal')) $columnsToDrop[] = 'is_seasonal';
+            if (Schema::hasColumn('achievements', 'grants_badge')) $columnsToDrop[] = 'grants_badge';
+
+            if (!empty($columnsToDrop)) {
+                $table->dropColumn($columnsToDrop);
+            }
         });
     }
 };
