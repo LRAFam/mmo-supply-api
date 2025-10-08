@@ -311,3 +311,20 @@ Route::middleware(['auth:sanctum'])->prefix('crypto')->name('crypto.')->group(fu
 // Crypto webhooks (no auth required)
 Route::post('/crypto/webhook', [CryptoPaymentController::class, 'handleWebhook']);
 Route::post('/crypto/payout-webhook', [CryptoPaymentController::class, 'handleWebhook']);
+
+// Season Pass routes
+Route::middleware(['auth:sanctum'])->prefix('season-pass')->group(function () {
+    Route::get('/', [App\Http\Controllers\SeasonPassController::class, 'index']);
+    Route::post('/purchase', [App\Http\Controllers\SeasonPassController::class, 'purchase']);
+    Route::get('/show', [App\Http\Controllers\SeasonPassController::class, 'show']);
+});
+
+// Achievement Store routes
+Route::middleware(['auth:sanctum'])->prefix('achievement-store')->group(function () {
+    Route::get('/', [App\Http\Controllers\AchievementStoreController::class, 'index']);
+    Route::post('/{itemId}/purchase', [App\Http\Controllers\AchievementStoreController::class, 'purchase']);
+    Route::get('/purchases', [App\Http\Controllers\AchievementStoreController::class, 'purchases']);
+    Route::get('/active-perks', [App\Http\Controllers\AchievementStoreController::class, 'activePerks']);
+    Route::post('/activate-cosmetic', [App\Http\Controllers\AchievementStoreController::class, 'activateCosmetic']);
+    Route::get('/inventory', [App\Http\Controllers\AchievementStoreController::class, 'inventory']);
+});
