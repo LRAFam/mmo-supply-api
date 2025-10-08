@@ -17,7 +17,7 @@ class SeasonPassController extends Controller
     public function index(Request $request)
     {
         $user = $request->user();
-        $season = Season::where('is_active', true)->first();
+        $season = Season::where('status', 'active')->first();
 
         if (!$season) {
             return response()->json([
@@ -112,7 +112,7 @@ class SeasonPassController extends Controller
         ]);
 
         $user = $request->user();
-        $season = Season::where('is_active', true)->first();
+        $season = Season::where('status', 'active')->first();
 
         if (!$season) {
             return response()->json([
@@ -213,7 +213,7 @@ class SeasonPassController extends Controller
     public function show(Request $request)
     {
         $user = $request->user();
-        $season = Season::where('is_active', true)->first();
+        $season = Season::where('status', 'active')->first();
 
         if (!$season) {
             return response()->json([
