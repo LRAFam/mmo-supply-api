@@ -178,7 +178,7 @@ class EventSeeder extends Seeder
                 'is_featured' => false,
             ],
 
-            // ============== DRAFT/INACTIVE EVENTS (FUTURE/LARGER BUDGET) ==============
+            // ============== INACTIVE EVENTS (FUTURE/LARGER BUDGET) ==============
             [
                 'name' => 'New Year Extravaganza',
                 'slug' => 'new-year-extravaganza',
@@ -188,7 +188,7 @@ class EventSeeder extends Seeder
                 'banner_image' => 'https://images.unsplash.com/photo-1467810563316-b5476525c0f9',
                 'starts_at' => now()->addWeeks(2),
                 'ends_at' => now()->addWeeks(2)->addDays(3),
-                'status' => 'draft',
+                'status' => 'cancelled',
                 'max_participants' => 1000,
                 'winner_count' => 250,
                 'prizes' => [
@@ -217,7 +217,7 @@ class EventSeeder extends Seeder
                 'banner_image' => 'https://images.unsplash.com/photo-1538481199705-c710c4e965fc',
                 'starts_at' => now()->addWeek(),
                 'ends_at' => now()->addWeek()->addDays(2),
-                'status' => 'draft',
+                'status' => 'cancelled',
                 'max_participants' => 64,
                 'winner_count' => 8,
                 'prizes' => [
@@ -245,7 +245,7 @@ class EventSeeder extends Seeder
                 'banner_image' => 'https://images.unsplash.com/photo-1533158388470-9a56699990c6',
                 'starts_at' => now()->addDays(10),
                 'ends_at' => now()->addDays(17),
-                'status' => 'draft',
+                'status' => 'cancelled',
                 'max_participants' => null,
                 'winner_count' => 50,
                 'prizes' => [
@@ -273,7 +273,7 @@ class EventSeeder extends Seeder
                 'banner_image' => 'https://images.unsplash.com/photo-1607083206968-13611e3d76db',
                 'starts_at' => now()->addMonths(2),
                 'ends_at' => now()->addMonths(2)->addDays(3),
-                'status' => 'draft',
+                'status' => 'cancelled',
                 'max_participants' => null,
                 'winner_count' => 100,
                 'prizes' => [
@@ -303,7 +303,7 @@ class EventSeeder extends Seeder
                 'banner_image' => 'https://images.unsplash.com/photo-1556740738-b6a63e27c4df',
                 'starts_at' => now()->startOfMonth(),
                 'ends_at' => now()->endOfMonth(),
-                'status' => 'draft',
+                'status' => 'cancelled',
                 'max_participants' => null,
                 'winner_count' => 10,
                 'prizes' => [
