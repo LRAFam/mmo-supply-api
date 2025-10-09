@@ -21,7 +21,7 @@ class EventController extends Controller
         if ($request->has('status')) {
             $query->where('status', $request->status);
         } else {
-            // Exclude cancelled/draft events by default
+            // Only show active, upcoming, and completed events by default (exclude draft and cancelled)
             $query->whereIn('status', ['active', 'upcoming', 'completed']);
         }
 
