@@ -49,11 +49,23 @@ class SetupAIConversations extends Command
         $this->newLine();
 
         // Find all users without AI Agent conversation
+        // Get users who have conversations with AI
+        $usersWithAI = Conversation::where(function ($query) use ($aiAgent) {
+            $query->where('user_one_id', $aiAgent->id)
+                ->orWhere('user_two_id', $aiAgent->id);
+        })
+        ->get()
+        ->map(function ($conversation) use ($aiAgent) {
+            return $conversation->user_one_id === $aiAgent->id
+                ? $conversation->user_two_id
+                : $conversation->user_one_id;
+        })
+        ->unique()
+        ->toArray();
+
+        // Get all regular users without AI conversation
         $usersWithoutAI = User::where('role', '!=', 'system')
-            ->whereDoesntHave('conversations', function ($query) use ($aiAgent) {
-                $query->where('user_one_id', $aiAgent->id)
-                    ->orWhere('user_two_id', $aiAgent->id);
-            })
+            ->whereNotIn('id', $usersWithAI)
             ->get();
 
         $totalUsers = $usersWithoutAI->count();
