@@ -9,7 +9,6 @@ use Illuminate\Support\Facades\Log;
 use Stripe\Stripe;
 use Stripe\Account;
 use Stripe\AccountLink;
-use Stripe\LoginLink;
 use Stripe\Transfer;
 
 class StripeConnectController extends Controller
@@ -140,7 +139,7 @@ class StripeConnectController extends Controller
         }
 
         try {
-            $loginLink = LoginLink::create($user->stripe_account_id);
+            $loginLink = Account::createLoginLink($user->stripe_account_id);
 
             return response()->json([
                 'success' => true,

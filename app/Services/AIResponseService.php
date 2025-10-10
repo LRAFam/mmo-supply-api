@@ -240,7 +240,7 @@ class AIResponseService
         }
 
         $featuredListings = FeaturedListing::where('user_id', $user->id)
-            ->where('featured_until', '>', now())
+            ->where('expires_at', '>', now())
             ->get();
 
         if ($featuredListings->isEmpty()) {
@@ -252,7 +252,7 @@ class AIResponseService
         $response = "Your active featured listings:\n\n";
 
         foreach ($featuredListings as $listing) {
-            $expiresAt = \Carbon\Carbon::parse($listing->featured_until);
+            $expiresAt = \Carbon\Carbon::parse($listing->expires_at);
             $hoursLeft = now()->diffInHours($expiresAt);
             $daysLeft = now()->diffInDays($expiresAt);
 
@@ -812,7 +812,7 @@ class AIResponseService
         // Featured listing tip
         if ($user->is_seller) {
             $activeListings = FeaturedListing::where('user_id', $user->id)
-                ->where('featured_until', '>', now())
+                ->where('expires_at', '>', now())
                 ->count();
 
             if ($activeListings === 0) {

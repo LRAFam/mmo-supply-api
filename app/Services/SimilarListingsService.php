@@ -168,7 +168,7 @@ class SimilarListingsService
         // Remove common filler words
         $fillerWords = ['the', 'a', 'an', 'x', '+', '-', 'new', 'used', 'rare', 'epic', 'legendary'];
         foreach ($fillerWords as $word) {
-            $normalized = preg_replace('/\b' . $word . '\b/i', '', $normalized);
+            $normalized = preg_replace('/\b' . preg_quote($word, '/') . '\b/i', '', $normalized);
         }
 
         // Remove special characters except alphanumeric and spaces
