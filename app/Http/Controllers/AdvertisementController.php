@@ -120,9 +120,9 @@ class AdvertisementController extends Controller
             'payment_method' => 'required|in:stripe,wallet',
         ]);
 
-        // Upload image
+        // Upload image to S3
         $imagePath = $request->file('image')->store('advertisements', 'public');
-        $imageUrl = Storage::url($imagePath);
+        $imageUrl = Storage::disk('public')->url($imagePath);
 
         // Cast duration to integer (FormData sends as string)
         $duration = (int) $validated['duration'];
