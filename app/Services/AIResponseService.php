@@ -253,14 +253,31 @@ class AIResponseService
 
         foreach ($featuredListings as $listing) {
             $expiresAt = \Carbon\Carbon::parse($listing->expires_at);
-            $hoursLeft = now()->diffInHours($expiresAt);
-            $daysLeft = now()->diffInDays($expiresAt);
+            $now = now();
 
-            $timeLeft = $daysLeft > 0
-                ? "{$daysLeft} days"
-                : ($hoursLeft > 0 ? "{$hoursLeft} hours" : "less than 1 hour");
+            // Calculate time remaining in a human-friendly way
+            $daysLeft = $now->diffInDays($expiresAt, false);
+            $hoursLeft = $now->copy()->addDays($daysLeft)->diffInHours($expiresAt, false);
 
-            $response .= "• **{$listing->listing_title}** - ⏰ {$timeLeft} remaining\n";
+            if ($daysLeft > 0 && $hoursLeft > 0) {
+                $timeLeft = "{$daysLeft} days, {$hoursLeft} hours";
+            } elseif ($daysLeft > 0) {
+                $timeLeft = "{$daysLeft} " . ($daysLeft === 1 ? 'day' : 'days');
+            } elseif ($hoursLeft > 0) {
+                $timeLeft = "{$hoursLeft} " . ($hoursLeft === 1 ? 'hour' : 'hours');
+            } else {
+                $minutesLeft = $now->diffInMinutes($expiresAt, false);
+                if ($minutesLeft > 0) {
+                    $timeLeft = "{$minutesLeft} " . ($minutesLeft === 1 ? 'minute' : 'minutes');
+                } else {
+                    $timeLeft = "less than a minute";
+                }
+            }
+
+            // Get listing title or product name
+            $listingTitle = $listing->listing_title ?? $listing->product_name ?? 'Featured Item';
+
+            $response .= "• **{$listingTitle}** - ⏰ {$timeLeft} remaining\n";
         }
 
         $response .= "\nYou'll get a notification when a featured listing is about to expire!";
