@@ -256,19 +256,25 @@ class AIResponseService
             $now = now();
 
             // Calculate time remaining in a human-friendly way
-            $daysLeft = $now->diffInDays($expiresAt, false);
-            $hoursLeft = $now->copy()->addDays($daysLeft)->diffInHours($expiresAt, false);
+            $totalHours = (int) $now->diffInHours($expiresAt, false);
+            $daysLeft = (int) floor($totalHours / 24);
+            $hoursLeft = $totalHours % 24;
 
             if ($daysLeft > 0 && $hoursLeft > 0) {
-                $timeLeft = "{$daysLeft} days, {$hoursLeft} hours";
+                $dayLabel = $daysLeft === 1 ? 'day' : 'days';
+                $hourLabel = $hoursLeft === 1 ? 'hour' : 'hours';
+                $timeLeft = "{$daysLeft} {$dayLabel}, {$hoursLeft} {$hourLabel}";
             } elseif ($daysLeft > 0) {
-                $timeLeft = "{$daysLeft} " . ($daysLeft === 1 ? 'day' : 'days');
+                $dayLabel = $daysLeft === 1 ? 'day' : 'days';
+                $timeLeft = "{$daysLeft} {$dayLabel}";
             } elseif ($hoursLeft > 0) {
-                $timeLeft = "{$hoursLeft} " . ($hoursLeft === 1 ? 'hour' : 'hours');
+                $hourLabel = $hoursLeft === 1 ? 'hour' : 'hours';
+                $timeLeft = "{$hoursLeft} {$hourLabel}";
             } else {
-                $minutesLeft = $now->diffInMinutes($expiresAt, false);
+                $minutesLeft = (int) $now->diffInMinutes($expiresAt, false);
                 if ($minutesLeft > 0) {
-                    $timeLeft = "{$minutesLeft} " . ($minutesLeft === 1 ? 'minute' : 'minutes');
+                    $minuteLabel = $minutesLeft === 1 ? 'minute' : 'minutes';
+                    $timeLeft = "{$minutesLeft} {$minuteLabel}";
                 } else {
                     $timeLeft = "less than a minute";
                 }
