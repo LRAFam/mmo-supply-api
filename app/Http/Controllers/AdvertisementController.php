@@ -19,6 +19,7 @@ class AdvertisementController extends Controller
 
         $ads = Advertisement::active()
             ->when($placement, fn($q) => $q->placement($placement))
+            ->whereNotNull('position')
             ->orderBy('position')
             ->get();
 
@@ -141,6 +142,9 @@ class AdvertisementController extends Controller
             }
         }
 
+        // Get the next position for this placement
+        $nextPosition = Advertisement::where('placement', $validated['placement'])->max('position') + 1;
+
         // Create advertisement
         $ad = Advertisement::create([
             'user_id' => $user->id,
@@ -149,6 +153,7 @@ class AdvertisementController extends Controller
             'image_url' => $imageUrl,
             'link_url' => $validated['link_url'],
             'placement' => $validated['placement'],
+            'position' => $nextPosition ?? 1,
             'ad_type' => 'Banner',
             'start_date' => now(),
             'end_date' => now()->addDays($duration),
