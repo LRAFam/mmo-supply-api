@@ -269,8 +269,21 @@ Route::group(['prefix' => 'accounts'], function () {
     Route::delete('/{id}', [AccountController::class, 'destroy'])->middleware('auth:sanctum')->name('accounts.destroy');
 });
 
+// Advertisement routes
 Route::group(['prefix' => 'advertisements'], function () {
-    Route::get('/', [AdvertisementController::class, 'index'])->name('advertisements.index');
+    // Public routes
+    Route::get('/active', [AdvertisementController::class, 'getActiveAds'])->name('advertisements.active');
+    Route::get('/pricing', [AdvertisementController::class, 'getPricing'])->name('advertisements.pricing');
+    Route::post('/{id}/impression', [AdvertisementController::class, 'recordImpression'])->name('advertisements.impression');
+    Route::post('/{id}/click', [AdvertisementController::class, 'recordClick'])->name('advertisements.click');
+
+    // Protected routes (require authentication)
+    Route::middleware('auth:sanctum')->group(function () {
+        Route::get('/my-ads', [AdvertisementController::class, 'getUserAds'])->name('advertisements.my');
+        Route::post('/', [AdvertisementController::class, 'store'])->name('advertisements.store');
+        Route::put('/{id}', [AdvertisementController::class, 'update'])->name('advertisements.update');
+        Route::delete('/{id}', [AdvertisementController::class, 'destroy'])->name('advertisements.destroy');
+    });
 });
 
 Route::group(['prefix' => 'providers'], function () {
