@@ -124,8 +124,11 @@ class AdvertisementController extends Controller
         $imagePath = $request->file('image')->store('advertisements', 'public');
         $imageUrl = Storage::url($imagePath);
 
+        // Cast duration to integer (FormData sends as string)
+        $duration = (int) $validated['duration'];
+
         // Calculate price based on placement and duration
-        $price = $this->calculatePrice($validated['placement'], $validated['duration']);
+        $price = $this->calculatePrice($validated['placement'], $duration);
 
         // Check wallet balance if paying with wallet
         if ($validated['payment_method'] === 'wallet') {
@@ -148,7 +151,7 @@ class AdvertisementController extends Controller
             'placement' => $validated['placement'],
             'ad_type' => 'Banner',
             'start_date' => now(),
-            'end_date' => now()->addDays($validated['duration']),
+            'end_date' => now()->addDays($duration),
             'payment_amount' => $price,
             'payment_status' => 'Pending',
             'is_active' => false, // Activate after payment
