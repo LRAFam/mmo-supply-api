@@ -7,6 +7,7 @@ use App\Models\OrderItem;
 use App\Models\Cart;
 use App\Services\StripePaymentService;
 use App\Services\NotificationService;
+use App\Services\AchievementCheckService;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
@@ -199,6 +200,10 @@ class OrderController extends Controller
 
                 // Clear cart after successful payment
                 $cart->delete();
+
+                // Check for buyer achievements after successful purchase
+                $achievementService = app(AchievementCheckService::class);
+                $achievementService->checkAndAutoClaimAchievements($user);
             } elseif ($request->payment_method === 'stripe') {
                 // Create Stripe payment intent
                 $stripeService = new StripePaymentService();
@@ -436,6 +441,10 @@ class OrderController extends Controller
         // Track sale for tier progression
         $seller->addSale($orderItem->total);
 
+        // Check for seller achievements after funds released
+        $achievementService = app(AchievementCheckService::class);
+        $achievementService->checkAndAutoClaimAchievements($seller);
+
         // Mark funds as released
         $orderItem->funds_released = true;
         $orderItem->funds_released_at = now();
@@ -585,6 +594,10 @@ class OrderController extends Controller
 
                             // Track sale for tier progression
                             $seller->addSale($item->total);
+
+                            // Check for seller achievements after successful sale
+                            $achievementService = app(AchievementCheckService::class);
+                            $achievementService->checkAndAutoClaimAchievements($seller);
                         }
 
                         // Update item status

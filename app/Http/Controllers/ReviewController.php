@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Review;
 use App\Models\OrderItem;
+use App\Services\AchievementCheckService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -48,6 +49,10 @@ class ReviewController extends Controller
             'comment' => $validated['comment'] ?? null,
             'is_approved' => true, // Auto-approve for now
         ]);
+
+        // Check for review-related achievements
+        $achievementService = app(AchievementCheckService::class);
+        $achievementService->checkAndAutoClaimAchievements($request->user());
 
         return response()->json([
             'message' => 'Review submitted successfully',

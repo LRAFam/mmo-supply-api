@@ -8,6 +8,7 @@ use App\Models\Transaction;
 use App\Models\Order;
 use App\Models\Cart;
 use App\Models\FeaturedListing;
+use App\Services\AchievementCheckService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -229,6 +230,10 @@ class StripeWebhookController extends Controller
                     'order_id' => $order->id,
                 ],
             ]);
+
+            // Check for buyer achievements after successful Stripe payment
+            $achievementService = app(AchievementCheckService::class);
+            $achievementService->checkAndAutoClaimAchievements($user);
 
             Log::info('Order payment processed successfully', [
                 'order_id' => $orderId,
