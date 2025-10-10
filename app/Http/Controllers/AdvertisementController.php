@@ -7,6 +7,7 @@ use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 
 class AdvertisementController extends Controller
 {
@@ -122,8 +123,16 @@ class AdvertisementController extends Controller
         ]);
 
         // Upload image to S3
-        $imagePath = $request->file('image')->store('advertisements', 'public');
-        $imageUrl = Storage::disk('public')->url($imagePath);
+        $file = $request->file('image');
+        $filename = Str::uuid() . '.' . $file->getClientOriginalExtension();
+
+        $imagePath = Storage::disk('s3')->putFileAs(
+            'advertisements',
+            $file,
+            $filename
+        );
+
+        $imageUrl = Storage::disk('s3')->url($imagePath);
 
         // Cast duration to integer (FormData sends as string)
         $duration = (int) $validated['duration'];
@@ -246,10 +255,16 @@ class AdvertisementController extends Controller
             ], 403);
         }
 
-        // Delete image from storage
+        // Delete image from S3
         if ($ad->image_url) {
-            $path = str_replace('/storage/', '', $ad->image_url);
-            Storage::disk('public')->delete($path);
+            // Extract path from S3 URL
+            // URL format: https://bucket.s3.region.amazonaws.com/path/to/file
+            $urlParts = parse_url($ad->image_url);
+            $path = ltrim($urlParts['path'] ?? '', '/');
+
+            if ($path) {
+                Storage::disk('s3')->delete($path);
+            }
         }
 
         $ad->delete();
