@@ -129,7 +129,8 @@ class AdvertisementController extends Controller
         $imagePath = Storage::disk('s3')->putFileAs(
             'advertisements',
             $file,
-            $filename
+            $filename,
+            'public' // Set visibility to public
         );
 
         $imageUrl = Storage::disk('s3')->url($imagePath);
