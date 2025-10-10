@@ -302,12 +302,13 @@ class AIResponseService
 
         $monthlySales = $user->monthly_sales ?? 0;
         $lifetimeSales = $user->lifetime_sales ?? 0;
-        $walletBalance = $user->wallet_balance ?? 0;
+        $wallet = $user->wallet;
+        $walletBalance = $wallet ? floatval($wallet->balance) : 0;
 
         $response = "📊 **Your Seller Stats**\n\n";
-        $response .= "💰 **This Month:** \${$monthlySales}\n";
-        $response .= "🎯 **Lifetime Sales:** \${$lifetimeSales}\n";
-        $response .= "💳 **Wallet Balance:** \${$walletBalance}\n\n";
+        $response .= "💰 **This Month:** \$" . number_format($monthlySales, 2) . "\n";
+        $response .= "🎯 **Lifetime Sales:** \$" . number_format($lifetimeSales, 2) . "\n";
+        $response .= "💳 **Wallet Balance:** \$" . number_format($walletBalance, 2) . "\n\n";
 
         $earningsPercentage = $user->getSellerEarningsPercentage();
         $response .= "You currently earn **{$earningsPercentage}%** of each sale after platform fees.";
@@ -320,16 +321,18 @@ class AIResponseService
      */
     private function getWalletBalanceResponse(User $user): string
     {
-        $walletBalance = $user->wallet_balance ?? 0;
+        // Use wallet relationship for actual balance
+        $wallet = $user->wallet;
+        $walletBalance = $wallet ? floatval($wallet->balance) : 0;
         $bonusBalance = $user->bonus_balance ?? 0;
         $totalBalance = $walletBalance + $bonusBalance;
 
         $response = "💰 **Your Wallet Balance**\n\n";
-        $response .= "**Available:** \${$walletBalance}\n";
+        $response .= "**Available:** \$" . number_format($walletBalance, 2) . "\n";
 
         if ($bonusBalance > 0) {
-            $response .= "**Bonus:** \${$bonusBalance}\n";
-            $response .= "**Total:** \${$totalBalance}\n\n";
+            $response .= "**Bonus:** \$" . number_format($bonusBalance, 2) . "\n";
+            $response .= "**Total:** \$" . number_format($totalBalance, 2) . "\n\n";
             $response .= "ℹ️ Bonus balance can only be used for purchases, not withdrawals.";
         } else {
             $response .= "\nYou can use your wallet balance to make purchases or withdraw to your bank account!";
@@ -665,11 +668,12 @@ class AIResponseService
     private function getWithdrawalResponse(User $user): string
     {
         $eligibility = $user->getWithdrawalEligibility();
-        $walletBalance = $user->wallet_balance ?? 0;
+        $wallet = $user->wallet;
+        $walletBalance = $wallet ? floatval($wallet->balance) : 0;
 
         if ($eligibility['can_withdraw']) {
             return "💰 **You can withdraw funds!**\n\n" .
-                   "**Available Balance:** \${$walletBalance}\n" .
+                   "**Available Balance:** \$" . number_format($walletBalance, 2) . "\n" .
                    "**Minimum Withdrawal:** \$10.00\n\n" .
                    "Withdraw to:\n" .
                    "• Bank account (via Stripe)\n" .
@@ -703,7 +707,7 @@ class AIResponseService
             $response .= "❌ Cooldown active - Wait {$daysLeft} more days\n";
         }
 
-        $response .= "\n**Current Balance:** \${$walletBalance}";
+        $response .= "\n**Current Balance:** \$" . number_format($walletBalance, 2);
 
         return $response;
     }
@@ -803,12 +807,13 @@ class AIResponseService
     private function getPersonalizedTipsResponse(User $user): string
     {
         $tips = [];
-        $walletBalance = $user->wallet_balance ?? 0;
         $achievementPoints = $user->achievement_points ?? 0;
 
         // Wallet tip
-        if ($walletBalance > 50 && !$user->is_seller) {
-            $tips[] = "💡 You have \${$walletBalance} in your wallet! Consider making a purchase or withdrawing funds.";
+        $wallet = $user->wallet;
+        if ($wallet && $wallet->balance > 50 && !$user->is_seller) {
+            $formattedBalance = number_format($wallet->balance, 2);
+            $tips[] = "💡 You have \${$formattedBalance} in your wallet! Consider making a purchase or withdrawing funds.";
         }
 
         // Achievement points tip
