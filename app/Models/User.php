@@ -213,6 +213,15 @@ class User extends Authenticatable implements FilamentUser
     }
 
     /**
+     * Conversations where user is a participant
+     */
+    public function conversations()
+    {
+        return Conversation::where('user_one_id', $this->id)
+            ->orWhere('user_two_id', $this->id);
+    }
+
+    /**
      * Reviews given by this user
      */
     public function givenReviews(): HasMany
