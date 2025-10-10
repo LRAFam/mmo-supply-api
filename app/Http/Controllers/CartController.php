@@ -96,6 +96,10 @@ class CartController extends Controller
             };
 
             $discount = floatval($product->discount ?? 0);
+            $discountPrice = $product->discount_price ? floatval($product->discount_price) : null;
+
+            // Calculate final price: use discount_price if set, otherwise price - discount
+            $finalPrice = $discountPrice ?? ($price - $discount);
 
             return [
                 'id' => $productId . '-' . $productType,
@@ -109,13 +113,14 @@ class CartController extends Controller
                     'description' => $product->description ?? '',
                     'price' => $price,
                     'discount' => $discount,
+                    'discount_price' => $discountPrice,
                     'images' => $product->images ?? [],
                     'game' => $product->game ? [
                         'id' => $product->game->id,
                         'title' => $product->game->title,
                     ] : null,
                 ],
-                'finalPrice' => $price - $discount,
+                'finalPrice' => $finalPrice,
             ];
         })->filter()->values();
 

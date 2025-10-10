@@ -332,9 +332,9 @@ class User extends Authenticatable implements FilamentUser
 
         // Use auto tier based on sales volume
         return match($this->auto_tier ?? 'standard') {
-            'premium' => 90.0,   // $5k+/month or $25k+ lifetime
-            'verified' => 80.0,  // $1k+/month or $5k+ lifetime
-            default => 70.0,     // Standard
+            'premium' => 92.0,   // $5k+/month or $25k+ lifetime
+            'verified' => 88.0,  // $1k+/month or $5k+ lifetime
+            default => 80.0,     // Standard
         };
     }
 

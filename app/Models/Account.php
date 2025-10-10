@@ -94,6 +94,10 @@ class Account extends Model
 
     public function getFinalPriceAttribute()
     {
+        // Use discount_price if set, otherwise calculate from price - discount
+        if ($this->discount_price !== null && $this->discount_price > 0) {
+            return $this->discount_price;
+        }
         return $this->price - ($this->discount ?? 0);
     }
 

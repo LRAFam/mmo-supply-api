@@ -56,6 +56,16 @@ class ItemController extends Controller
         return response()->json($item);
     }
 
+    public function similar($id): JsonResponse
+    {
+        $similarService = new \App\Services\SimilarListingsService();
+        $similar = $similarService->findSimilar('item', $id);
+
+        return response()->json([
+            'similar_listings' => $similar
+        ]);
+    }
+
     public function store(Request $request): JsonResponse
     {
         $validated = $request->validate([

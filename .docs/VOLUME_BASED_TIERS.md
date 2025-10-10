@@ -6,34 +6,34 @@ The platform uses an **automatic, performance-based tier system** where provider
 
 ## Tier Structure
 
-### 🥉 Standard Provider (70/30 split)
+### 🥉 Standard Provider (80/20 split)
 - **Default tier** for all new sellers
 - **Requirements**: $0 - $999/month OR $0 - $4,999 lifetime sales
-- **Provider Keeps**: 70%
-- **Platform Gets**: 30%
+- **Provider Keeps**: 80%
+- **Platform Gets**: 20%
 - **Badge**: None
 
-### 🥈 Verified Provider (80/20 split)
+### 🥈 Verified Provider (88/12 split)
 - **Automatic upgrade** when either threshold is met:
   - $1,000+ in monthly sales, OR
   - $5,000+ in lifetime sales
-- **Provider Keeps**: 80%
-- **Platform Gets**: 20%
+- **Provider Keeps**: 88%
+- **Platform Gets**: 12%
 - **Badge**: ✓ Verified
 - **Benefits**:
-  - Keep 10% more per sale
+  - Keep 8% more per sale
   - Trust indicator for buyers
   - Priority in search results (coming soon)
 
-### 🥇 Premium Provider (90/10 split)
+### 🥇 Premium Provider (92/8 split)
 - **Automatic upgrade** when either threshold is met:
   - $5,000+ in monthly sales, OR
   - $25,000+ in lifetime sales
-- **Provider Keeps**: 90%
-- **Platform Gets**: 10%
+- **Provider Keeps**: 92%
+- **Platform Gets**: 8%
 - **Badge**: ⭐ Premium
 - **Benefits**:
-  - Keep 20% more per sale than Standard
+  - Keep 12% more per sale than Standard
   - Elite trust indicator
   - Top priority in search
   - Featured in provider showcase
@@ -65,12 +65,12 @@ The platform uses an **automatic, performance-based tier system** where provider
 
 ## Revenue Comparison
 
-| Monthly Sales | Standard (70%) | Verified (80%) | Premium (90%) |
+| Monthly Sales | Standard (80%) | Verified (88%) | Premium (92%) |
 |---------------|----------------|----------------|---------------|
-| $500          | Keep $350      | Keep $400      | Keep $450     |
-| $1,000        | Keep $700      | Keep $800      | Keep $900     |
-| $5,000        | Keep $3,500    | Keep $4,000    | Keep $4,500   |
-| $10,000       | Keep $7,000    | Keep $8,000    | Keep $9,000   |
+| $500          | Keep $400      | Keep $440      | Keep $460     |
+| $1,000        | Keep $800      | Keep $880      | Keep $920     |
+| $5,000        | Keep $4,000    | Keep $4,400    | Keep $4,600   |
+| $10,000       | Keep $8,000    | Keep $8,800    | Keep $9,200   |
 
 ## Why This Model is Better
 
@@ -122,7 +122,7 @@ GET /api/provider/tier-progress
     "current_tier": "standard",
     "monthly_sales": 450.00,
     "lifetime_sales": 2150.00,
-    "earnings_percentage": 70.0,
+    "earnings_percentage": 80.0,
     "next_tier": "verified",
     "monthly_needed": 550.00,
     "lifetime_needed": 2850.00,
@@ -166,13 +166,13 @@ This creates a "Partner" tier with custom percentage that overrides the automati
 ## Marketing Messages
 
 ### For Standard Providers:
-> "You're keeping 70% of every sale. Reach $1,000/month or $5,000 lifetime to unlock Verified status and keep 80%!"
+> "You're keeping 80% of every sale. Reach $1,000/month or $5,000 lifetime to unlock Verified status and keep 88%!"
 
 ### For Verified Providers:
-> "You're keeping 80% of every sale! Reach $5,000/month or $25,000 lifetime to unlock Premium status and keep 90%!"
+> "You're keeping 88% of every sale! Reach $5,000/month or $25,000 lifetime to unlock Premium status and keep 92%!"
 
 ### For Premium Providers:
-> "You're a Premium Provider keeping 90% of every sale! You've reached the top tier."
+> "You're a Premium Provider keeping 92% of every sale! You've reached the top tier."
 
 ## Future Enhancements
 

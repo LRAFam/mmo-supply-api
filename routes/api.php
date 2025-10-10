@@ -226,6 +226,7 @@ Route::group(['prefix' => 'games'], function () {
 Route::group(['prefix' => 'services'], function () {
     Route::get('/', [ServiceController::class, 'index'])->name('services.index');
     Route::get('/{id}', [ServiceController::class, 'show'])->name('services.show');
+    Route::get('/{id}/similar', [ServiceController::class, 'similar'])->name('services.similar');
     Route::post('/', [ServiceController::class, 'store'])->middleware('auth:sanctum')->name('services.store');
     Route::put('/{id}', [ServiceController::class, 'update'])->middleware('auth:sanctum')->name('services.update');
     Route::delete('/{id}', [ServiceController::class, 'destroy'])->middleware('auth:sanctum')->name('services.destroy');
@@ -234,6 +235,7 @@ Route::group(['prefix' => 'services'], function () {
 Route::group(['prefix' => 'items'], function () {
     Route::get('/', [ItemController::class, 'index'])->name('items.index');
     Route::get('/{id}', [ItemController::class, 'show'])->name('items.show');
+    Route::get('/{id}/similar', [ItemController::class, 'similar'])->name('items.similar');
     Route::post('/', [ItemController::class, 'store'])->middleware('auth:sanctum')->name('items.store');
     Route::put('/{id}', [ItemController::class, 'update'])->middleware('auth:sanctum')->name('items.update');
     Route::delete('/{id}', [ItemController::class, 'destroy'])->middleware('auth:sanctum')->name('items.destroy');
@@ -242,6 +244,7 @@ Route::group(['prefix' => 'items'], function () {
 Route::group(['prefix' => 'currencies'], function () {
     Route::get('/', [CurrencyController::class, 'index'])->name('currencies.index');
     Route::get('/{id}', [CurrencyController::class, 'show'])->name('currencies.show');
+    Route::get('/{id}/similar', [CurrencyController::class, 'similar'])->name('currencies.similar');
     Route::post('/', [CurrencyController::class, 'store'])->middleware('auth:sanctum')->name('currencies.store');
     Route::put('/{id}', [CurrencyController::class, 'update'])->middleware('auth:sanctum')->name('currencies.update');
     Route::delete('/{id}', [CurrencyController::class, 'destroy'])->middleware('auth:sanctum')->name('currencies.destroy');
@@ -250,6 +253,7 @@ Route::group(['prefix' => 'currencies'], function () {
 Route::group(['prefix' => 'accounts'], function () {
     Route::get('/', [AccountController::class, 'index'])->name('accounts.index');
     Route::get('/{id}', [AccountController::class, 'show'])->name('accounts.show');
+    Route::get('/{id}/similar', [AccountController::class, 'similar'])->name('accounts.similar');
     Route::post('/', [AccountController::class, 'store'])->middleware('auth:sanctum')->name('accounts.store');
     Route::put('/{id}', [AccountController::class, 'update'])->middleware('auth:sanctum')->name('accounts.update');
     Route::delete('/{id}', [AccountController::class, 'destroy'])->middleware('auth:sanctum')->name('accounts.destroy');

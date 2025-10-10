@@ -64,7 +64,7 @@ class SubscriptionService
                     'analytics_tier' => 'basic',
                     'custom_storefront' => false,
                     'email_marketing' => false,
-                    'earnings_percentage' => 70.0,
+                    'earnings_percentage' => 80.0,
                 ],
             ],
             'premium' => [
@@ -86,7 +86,7 @@ class SubscriptionService
                     'analytics_tier' => 'advanced',
                     'custom_storefront' => true,
                     'email_marketing' => true,
-                    'earnings_percentage' => 80.0,
+                    'earnings_percentage' => 88.0,
                 ],
             ],
             'elite' => [
@@ -119,7 +119,7 @@ class SubscriptionService
                     'api_access' => true,
                     'bulk_operations' => true,
                     'early_features' => true,
-                    'earnings_percentage' => 90.0,
+                    'earnings_percentage' => 92.0,
                 ],
             ],
         ];
@@ -144,7 +144,7 @@ class SubscriptionService
                     'Unlimited basic listings',
                     'Basic analytics',
                     'Standard visibility',
-                    'Keep 70% of sales',
+                    'Keep 80% of sales',
                 ],
             ],
             'premium' => [
@@ -167,7 +167,7 @@ class SubscriptionService
                     '✨ Advanced analytics dashboard',
                     '✨ Custom storefront colors & branding',
                     '✨ Email marketing tools',
-                    '✨ Keep 80% of sales (+10% vs Free)',
+                    '✨ Keep 88% of sales (+8% vs Free)',
                 ],
             ],
             'elite' => [
@@ -195,7 +195,7 @@ class SubscriptionService
                     '👑 API access for automation',
                     '👑 Bulk operations tools',
                     '👑 Early feature access (beta)',
-                    '👑 Keep 90% of sales (+20% vs Free)',
+                    '👑 Keep 92% of sales (+12% vs Free)',
                 ],
             ],
         ];
