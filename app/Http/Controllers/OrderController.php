@@ -6,6 +6,7 @@ use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\Cart;
 use App\Services\StripePaymentService;
+use App\Services\NotificationService;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
@@ -176,9 +177,18 @@ class OrderController extends Controller
                 'buyer_notes' => $request->buyer_notes,
             ]);
 
-            // Create order items
+            // Create order items and notify sellers
+            $notificationService = app(NotificationService::class);
             foreach ($orderItems as $item) {
-                OrderItem::create(array_merge(['order_id' => $order->id], $item));
+                $orderItem = OrderItem::create(array_merge(['order_id' => $order->id], $item));
+
+                // Notify seller of new order
+                $notificationService->newOrderForSeller(
+                    sellerId: $item['seller_id'],
+                    orderId: $order->id,
+                    productTitle: $item['product_name'],
+                    amount: $item['total']
+                );
             }
 
             // Process payment based on method
@@ -600,6 +610,18 @@ class OrderController extends Controller
             if ($oldStatus !== $request->status) {
                 \Mail::to($order->buyer->email)->send(
                     new \App\Mail\OrderStatusUpdatedMail($order->load('items'), $oldStatus, $request->status)
+                );
+
+                // Send notification to buyer via AI Agent
+                $notificationService = app(NotificationService::class);
+                $firstItem = $order->items->first();
+                $orderTitle = $firstItem ? $firstItem->product_name : "Order #{$order->id}";
+
+                $notificationService->orderStatusUpdated(
+                    userId: $order->user_id,
+                    orderId: $order->id,
+                    status: $request->status,
+                    orderTitle: $orderTitle
                 );
             }
 

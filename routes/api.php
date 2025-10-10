@@ -14,6 +14,7 @@ use App\Http\Controllers\GameController;
 use App\Http\Controllers\ItemController;
 use App\Http\Controllers\LeaderboardController;
 use App\Http\Controllers\MessageController;
+use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\OrderController;
 use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\ProviderController;
@@ -148,6 +149,15 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/messages/send', [MessageController::class, 'sendMessage']);
     Route::post('/messages/start', [MessageController::class, 'startConversation']);
     Route::get('/messages/unread-count', [MessageController::class, 'getUnreadCount']);
+
+    // Notifications
+    Route::get('/notifications', [App\Http\Controllers\NotificationController::class, 'index']);
+    Route::get('/notifications/unread-count', [App\Http\Controllers\NotificationController::class, 'unreadCount']);
+    Route::get('/notifications/recent', [App\Http\Controllers\NotificationController::class, 'recent']);
+    Route::get('/notifications/{id}', [App\Http\Controllers\NotificationController::class, 'show']);
+    Route::post('/notifications/{id}/read', [App\Http\Controllers\NotificationController::class, 'markAsRead']);
+    Route::post('/notifications/read-all', [App\Http\Controllers\NotificationController::class, 'markAllAsRead']);
+    Route::delete('/notifications/{id}', [App\Http\Controllers\NotificationController::class, 'destroy']);
 
     // Achievements
     Route::get('/achievements', [AchievementController::class, 'index']);

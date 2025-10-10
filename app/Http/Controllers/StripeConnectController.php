@@ -29,13 +29,22 @@ class StripeConnectController extends Controller
         try {
             // Create Stripe Connect account if user doesn't have one
             if (!$user->stripe_account_id) {
+                // Get country from request or user profile, default to GB (UK)
+                $country = $request->input('country', $user->country ?? 'GB');
+
+                // For US accounts, we need both card_payments and transfers capabilities
+                // For other countries, transfers is usually sufficient
+                $capabilities = ['transfers' => ['requested' => true]];
+
+                if ($country === 'US') {
+                    $capabilities['card_payments'] = ['requested' => true];
+                }
+
                 $account = Account::create([
                     'type' => 'express',
-                    'country' => 'US', // You may want to make this configurable
+                    'country' => strtoupper($country),
                     'email' => $user->email,
-                    'capabilities' => [
-                        'transfers' => ['requested' => true],
-                    ],
+                    'capabilities' => $capabilities,
                     'metadata' => [
                         'user_id' => $user->id,
                         'user_name' => $user->name,

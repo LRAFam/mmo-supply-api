@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Achievement;
+use App\Services\NotificationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -217,6 +218,7 @@ class AchievementController extends Controller
     {
         $user = $request->user();
         $newlyUnlocked = [];
+        $notificationService = app(NotificationService::class);
 
         $achievements = Achievement::where('is_active', true)->get();
 
@@ -232,6 +234,13 @@ class AchievementController extends Controller
                     'points' => $achievement->points,
                     'wallet_reward' => $achievement->wallet_reward,
                 ];
+
+                // Send notification for achievement unlock
+                $notificationService->achievementUnlocked(
+                    userId: $user->id,
+                    achievementName: $achievement->name,
+                    points: $achievement->points
+                );
             }
         }
 

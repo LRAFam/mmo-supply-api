@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Conversation;
 use App\Models\Message;
 use App\Models\User;
+use App\Services\AIResponseService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -16,6 +17,9 @@ class MessageController extends Controller
     public function getConversations(Request $request): JsonResponse
     {
         $user = $request->user();
+
+        // Ensure AI Agent conversation exists
+        $this->ensureAIConversationExists($user);
 
         $conversations = Conversation::where('user_one_id', $user->id)
             ->orWhere('user_two_id', $user->id)
@@ -32,9 +36,12 @@ class MessageController extends Controller
                     'id' => $conversation->id,
                     'order_id' => $conversation->order_id,
                     'subject' => $conversation->subject,
+                    'is_ai_agent' => $otherUser->role === 'system',
                     'other_user' => [
                         'id' => $otherUser->id,
                         'name' => $otherUser->name,
+                        'username' => $otherUser->username ?? $otherUser->name,
+                        'role' => $otherUser->role,
                     ],
                     'latest_message' => $latestMessage ? [
                         'message' => $latestMessage->message,
@@ -126,10 +133,30 @@ class MessageController extends Controller
             'conversation_id' => $conversation->id,
             'sender_id' => $user->id,
             'message' => $request->message,
+            'type' => 'user',
         ]);
 
         // Update conversation last message time
         $conversation->update(['last_message_at' => now()]);
+
+        // Check if messaging AI Agent - if so, generate response
+        $recipient = User::find($recipientId);
+        if ($recipient && $recipient->role === 'system') {
+            $aiResponseService = app(AIResponseService::class);
+            $aiResponse = $aiResponseService->generateResponse($user, $request->message);
+
+            // Create AI response message
+            $aiMessage = Message::create([
+                'conversation_id' => $conversation->id,
+                'sender_id' => $recipientId,
+                'message' => $aiResponse,
+                'type' => 'ai_agent',
+                'is_read' => false,
+            ]);
+
+            // Update conversation time again
+            $conversation->update(['last_message_at' => now()]);
+        }
 
         return response()->json([
             'success' => true,
@@ -145,6 +172,11 @@ class MessageController extends Controller
                 'is_read' => false,
                 'created_at' => $message->created_at,
             ],
+            'ai_response' => isset($aiMessage) ? [
+                'id' => $aiMessage->id,
+                'message' => $aiMessage->message,
+                'created_at' => $aiMessage->created_at,
+            ] : null,
         ], 201);
     }
 
@@ -199,6 +231,57 @@ class MessageController extends Controller
         return response()->json([
             'success' => true,
             'unread_count' => $unreadCount,
+        ]);
+    }
+
+    /**
+     * Ensure AI Agent conversation exists for user
+     */
+    private function ensureAIConversationExists(User $user): void
+    {
+        // Get AI Agent user
+        $aiAgent = User::where('role', 'system')
+            ->where('email', 'agent@mmosupply.com')
+            ->first();
+
+        if (!$aiAgent) {
+            return; // AI Agent not found
+        }
+
+        // Check if conversation already exists
+        $conversationExists = Conversation::where(function ($query) use ($user, $aiAgent) {
+            $query->where('user_one_id', $user->id)
+                ->where('user_two_id', $aiAgent->id);
+        })->orWhere(function ($query) use ($user, $aiAgent) {
+            $query->where('user_one_id', $aiAgent->id)
+                ->where('user_two_id', $user->id);
+        })->exists();
+
+        if ($conversationExists) {
+            return; // Conversation already exists
+        }
+
+        // Create conversation with AI Agent
+        $conversation = Conversation::create([
+            'user_one_id' => $user->id,
+            'user_two_id' => $aiAgent->id,
+            'subject' => 'Chat with MMO Supply Assistant',
+            'last_message_at' => now(),
+        ]);
+
+        // Send welcome message from AI Agent
+        Message::create([
+            'conversation_id' => $conversation->id,
+            'sender_id' => $aiAgent->id,
+            'type' => 'ai_agent',
+            'message' => "👋 Hi {$user->name}! I'm your MMO Supply Assistant.\n\n" .
+                        "I'm here to help you 24/7! I can:\n" .
+                        "• Track your orders and listings\n" .
+                        "• Check your stats and achievements\n" .
+                        "• Answer questions about the platform\n" .
+                        "• Provide personalized recommendations\n\n" .
+                        "Just ask me anything - try \"What's my wallet balance?\" or \"How many achievement points do I have?\"",
+            'is_read' => false,
         ]);
     }
 }
