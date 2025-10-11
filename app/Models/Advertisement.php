@@ -73,6 +73,7 @@ class Advertisement extends Model
     public function recordImpression(): void
     {
         $this->increment('impressions');
+        $this->refresh(); // Reload to get updated impressions count
         $this->updateCTR();
     }
 
@@ -82,6 +83,7 @@ class Advertisement extends Model
     public function recordClick(): void
     {
         $this->increment('clicks');
+        $this->refresh(); // Reload to get updated clicks count
         $this->updateCTR();
     }
 
@@ -91,9 +93,8 @@ class Advertisement extends Model
     private function updateCTR(): void
     {
         if ($this->impressions > 0) {
-            $this->update([
-                'ctr' => ($this->clicks / $this->impressions) * 100
-            ]);
+            $ctr = ($this->clicks / $this->impressions) * 100;
+            $this->update(['ctr' => round($ctr, 2)]);
         }
     }
 
