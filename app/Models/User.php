@@ -32,6 +32,7 @@ class User extends Authenticatable implements FilamentUser
         'wallet_balance',
         'bonus_balance',
         'avatar',
+        'banner',
         'bio',
         'stripe_account_id',
         'stripe_onboarding_complete',

@@ -82,14 +82,174 @@ class UserController extends Controller
     }
 
     /**
-     * Show user profile (authenticated)
+     * Show user profile (public - comprehensive view)
      */
     public function show($userId): JsonResponse
     {
-        $user = User::find($userId);
+        $user = User::with([
+            'achievements' => function ($query) {
+                $query->where('is_active', true)
+                      ->orderBy('user_achievements.unlocked_at', 'desc')
+                      ->limit(20);
+            }
+        ])->find($userId);
 
         if (!$user) {
             return response()->json(['error' => 'User not found'], 404);
+        }
+
+        // Get seller stats
+        $sellerStats = null;
+        if ($user->is_seller) {
+            $totalSales = $user->sellerOrders()->where('payment_status', 'completed')->count();
+            $averageRating = $user->receivedReviews()->avg('rating') ?? 0;
+            $totalReviews = $user->receivedReviews()->count();
+
+            $sellerStats = [
+                'total_sales' => $totalSales,
+                'monthly_sales' => $user->monthly_sales ?? 0,
+                'lifetime_sales' => $user->lifetime_sales ?? 0,
+                'average_rating' => round($averageRating, 2),
+                'total_reviews' => $totalReviews,
+                'seller_tier' => $user->seller_tier,
+                'auto_tier' => $user->auto_tier,
+            ];
+        }
+
+        // Get recent reviews
+        $recentReviews = $user->receivedReviews()
+            ->with(['user:id,name,avatar'])
+            ->orderBy('created_at', 'desc')
+            ->limit(10)
+            ->get()
+            ->map(function ($review) {
+                return [
+                    'id' => $review->id,
+                    'rating' => $review->rating,
+                    'comment' => $review->comment,
+                    'created_at' => $review->created_at,
+                    'reviewer' => [
+                        'id' => $review->user->id,
+                        'name' => $review->user->name,
+                        'avatar' => $review->user->avatar,
+                    ],
+                ];
+            });
+
+        // Get unlocked achievements
+        $achievements = $user->achievements->map(function ($achievement) {
+            return [
+                'id' => $achievement->id,
+                'name' => $achievement->name,
+                'slug' => $achievement->slug,
+                'icon' => $achievement->icon,
+                'tier' => $achievement->tier,
+                'unlocked_at' => $achievement->pivot->unlocked_at,
+            ];
+        });
+
+        // Get active products if seller
+        $products = [];
+        if ($user->is_seller) {
+            // Get items
+            $items = \App\Models\Item::where('user_id', $user->id)
+                ->where('is_active', true)
+                ->with('game')
+                ->limit(12)
+                ->get()
+                ->map(function ($item) {
+                    return [
+                        'id' => $item->id,
+                        'type' => 'item',
+                        'title' => $item->title,
+                        'description' => $item->description,
+                        'price' => $item->price,
+                        'stock_quantity' => $item->stock_quantity,
+                        'image' => $item->image,
+                        'game' => [
+                            'id' => $item->game->id,
+                            'title' => $item->game->title,
+                        ],
+                        'created_at' => $item->created_at,
+                    ];
+                });
+
+            // Get currencies
+            $currencies = \App\Models\Currency::where('user_id', $user->id)
+                ->where('is_active', true)
+                ->with('game')
+                ->limit(12)
+                ->get()
+                ->map(function ($currency) {
+                    return [
+                        'id' => $currency->id,
+                        'type' => 'currency',
+                        'title' => $currency->currency_type,
+                        'description' => $currency->description,
+                        'price' => $currency->price_per_unit,
+                        'stock_quantity' => $currency->quantity_available,
+                        'image' => $currency->image,
+                        'game' => [
+                            'id' => $currency->game->id,
+                            'title' => $currency->game->title,
+                        ],
+                        'created_at' => $currency->created_at,
+                    ];
+                });
+
+            // Get accounts
+            $accounts = \App\Models\Account::where('user_id', $user->id)
+                ->where('is_active', true)
+                ->with('game')
+                ->limit(12)
+                ->get()
+                ->map(function ($account) {
+                    return [
+                        'id' => $account->id,
+                        'type' => 'account',
+                        'title' => $account->title,
+                        'description' => $account->description,
+                        'price' => $account->price,
+                        'stock_quantity' => 1,
+                        'image' => $account->image,
+                        'game' => [
+                            'id' => $account->game->id,
+                            'title' => $account->game->title,
+                        ],
+                        'created_at' => $account->created_at,
+                    ];
+                });
+
+            // Get services
+            $services = \App\Models\Service::where('user_id', $user->id)
+                ->where('is_active', true)
+                ->with('game')
+                ->limit(12)
+                ->get()
+                ->map(function ($service) {
+                    return [
+                        'id' => $service->id,
+                        'type' => 'service',
+                        'title' => $service->title,
+                        'description' => $service->description,
+                        'price' => $service->price,
+                        'stock_quantity' => null,
+                        'image' => $service->image,
+                        'game' => [
+                            'id' => $service->game->id,
+                            'title' => $service->game->title,
+                        ],
+                        'created_at' => $service->created_at,
+                    ];
+                });
+
+            // Merge all products and sort by created_at
+            $products = $items->concat($currencies)
+                ->concat($accounts)
+                ->concat($services)
+                ->sortByDesc('created_at')
+                ->take(12)
+                ->values();
         }
 
         return response()->json([
@@ -97,14 +257,25 @@ class UserController extends Controller
             'user' => [
                 'id' => $user->id,
                 'name' => $user->name,
-                'email' => $user->email,
                 'avatar' => $user->avatar,
+                'banner' => $user->banner,
                 'bio' => $user->bio,
                 'is_seller' => (bool) $user->is_seller,
-                'seller_tier' => $user->seller_tier,
                 'subscription_tier' => $user->getSubscriptionTier(),
                 'created_at' => $user->created_at,
+                // Cosmetics
+                'owned_cosmetics' => $user->owned_cosmetics ?? [],
+                'badge_inventory' => $user->badge_inventory ?? [],
+                'active_profile_theme' => $user->active_profile_theme,
+                'active_title' => $user->active_title,
+                // Stats
+                'achievement_points' => $user->achievement_points ?? 0,
+                'total_achievements' => $achievements->count(),
+                'seller_stats' => $sellerStats,
             ],
+            'achievements' => $achievements,
+            'reviews' => $recentReviews,
+            'products' => $products,
         ]);
     }
 
