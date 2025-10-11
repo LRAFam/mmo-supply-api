@@ -300,7 +300,9 @@ class AchievementController extends Controller
             ], 400);
         }
 
+        // Refresh user and wallet to get updated balance
         $user->refresh();
+        $wallet = $user->wallet()->first();
 
         return response()->json([
             'message' => 'Reward claimed successfully',
@@ -308,7 +310,8 @@ class AchievementController extends Controller
                 'points' => $achievement->points,
                 'wallet_reward' => $achievement->wallet_reward,
             ],
-            'new_wallet_balance' => $user->wallet_balance,
+            'new_wallet_balance' => $wallet ? $wallet->balance : $user->wallet_balance,
+            'achievement_points' => $user->achievement_points,
         ]);
     }
 }
