@@ -168,6 +168,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/achievements/stats', [AchievementController::class, 'userStats']);
     Route::post('/achievements/check', [AchievementController::class, 'checkUnlockable']);
     Route::post('/achievements/{achievementId}/claim', [AchievementController::class, 'claimReward']);
+    Route::post('/achievements/claim-all', [AchievementController::class, 'claimAll']);
     Route::get('/achievements/recent', [AchievementController::class, 'recent']);
 
     // Events

@@ -195,7 +195,13 @@ class AchievementController extends Controller
             ->get()
             ->pluck('count', 'tier');
 
-        $totalPoints = $user->achievements()->sum('points');
+        // Use the user's actual spendable achievement_points instead of sum
+        $spendablePoints = $user->achievement_points;
+
+        // Calculate total earned points (including spent)
+        $totalEarnedPoints = $user->achievements()->sum('points');
+
+        // Calculate potential wallet rewards
         $totalWalletRewards = $user->achievements()->sum('wallet_reward');
 
         return response()->json([
@@ -206,7 +212,8 @@ class AchievementController extends Controller
                 : 0,
             'unlocked_by_category' => $unlockedByCategory,
             'unlocked_by_tier' => $unlockedByTier,
-            'total_points' => $totalPoints,
+            'spendable_points' => $spendablePoints, // Current spendable balance
+            'total_earned_points' => $totalEarnedPoints, // Lifetime earned (including spent)
             'total_wallet_rewards' => $totalWalletRewards,
         ]);
     }
@@ -312,6 +319,52 @@ class AchievementController extends Controller
             ],
             'new_wallet_balance' => $wallet ? $wallet->balance : $user->wallet_balance,
             'achievement_points' => $user->achievement_points,
+        ]);
+    }
+
+    /**
+     * Bulk claim all unclaimed achievement rewards
+     * Useful for users who have unlocked achievements before auto-claim was implemented
+     */
+    public function claimAll(Request $request): JsonResponse
+    {
+        $user = $request->user();
+
+        // Get all unclaimed achievements
+        $unclaimedAchievements = $user->achievements()
+            ->wherePivot('reward_claimed', false)
+            ->get();
+
+        if ($unclaimedAchievements->isEmpty()) {
+            return response()->json([
+                'message' => 'No unclaimed rewards found',
+                'claimed_count' => 0,
+            ]);
+        }
+
+        $claimedCount = 0;
+        $totalPoints = 0;
+        $totalWalletReward = 0;
+
+        foreach ($unclaimedAchievements as $achievement) {
+            $claimed = $achievement->claimReward($user);
+            if ($claimed) {
+                $claimedCount++;
+                $totalPoints += $achievement->points;
+                $totalWalletReward += $achievement->wallet_reward;
+            }
+        }
+
+        // Refresh user to get updated balances
+        $user->refresh();
+
+        return response()->json([
+            'message' => "Successfully claimed {$claimedCount} achievement rewards",
+            'claimed_count' => $claimedCount,
+            'total_points_earned' => $totalPoints,
+            'total_wallet_rewards' => $totalWalletReward,
+            'new_achievement_points' => $user->achievement_points,
+            'new_wallet_balance' => $user->wallet_balance,
         ]);
     }
 }

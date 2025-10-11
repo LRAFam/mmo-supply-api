@@ -83,7 +83,7 @@ class Achievement extends Model
     }
 
     /**
-     * Unlock achievement for a user (does NOT auto-claim reward)
+     * Unlock achievement for a user and automatically claim reward
      */
     public function unlockFor(User $user): bool
     {
@@ -91,22 +91,87 @@ class Achievement extends Model
             return false;
         }
 
+        DB::beginTransaction();
         try {
-            // Attach achievement to user with reward_claimed = false
+            // Attach achievement to user
             $this->users()->attach($user->id, [
                 'unlocked_at' => now(),
                 'is_notified' => false,
-                'reward_claimed' => false,
+                'reward_claimed' => true, // Auto-claim on unlock
+                'reward_claimed_at' => now(),
             ]);
 
+            // Automatically award rewards
+            $this->awardRewards($user);
+
+            DB::commit();
             return true;
         } catch (\Exception $e) {
+            DB::rollBack();
             throw $e;
         }
     }
 
     /**
-     * Claim reward for this achievement
+     * Award rewards to user (called automatically on unlock)
+     */
+    private function awardRewards(User $user): void
+    {
+        // Check if user has a valid season pass for cash rewards
+        $seasonPass = null;
+        if ($this->season_id) {
+            $seasonPass = $user->seasonPasses()
+                ->where('season_id', $this->season_id)
+                ->where('is_active', true)
+                ->first();
+        }
+
+        // Calculate cash reward based on season pass tier (only if they have a pass)
+        $cashReward = 0;
+        if ($this->wallet_reward > 0 && $seasonPass) {
+            $cashReward = $seasonPass->calculateReward($this->wallet_reward);
+
+            if ($cashReward > 0) {
+                $user->increment('wallet_balance', $cashReward);
+
+                // Also update the Wallet model balance
+                $wallet = $user->wallet;
+                if ($wallet) {
+                    $wallet->increment('balance', $cashReward);
+
+                    // Create transaction record
+                    $wallet->transactions()->create([
+                        'user_id' => $user->id,
+                        'type' => 'achievement',
+                        'amount' => $cashReward,
+                        'status' => 'completed',
+                        'description' => "Achievement reward: {$this->name}" .
+                            ($seasonPass ? " ({$seasonPass->getTierDisplayName()} Pass)" : ''),
+                    ]);
+                }
+            }
+        }
+
+        // Award achievement points (ALL users get points, even without a season pass)
+        $pointsToAward = $this->points;
+        if (!$pointsToAward && $this->tier) {
+            // Fallback to config if not set on achievement
+            $pointValues = config('achievements.point_values', []);
+            $pointsToAward = $pointValues[$this->tier] ?? 0;
+        }
+
+        if ($pointsToAward > 0) {
+            $user->increment('achievement_points', $pointsToAward);
+        }
+
+        // Grant badge if this is a badge-granting achievement
+        if ($this->grants_badge && $this->badge_icon) {
+            $user->addBadge($this->slug, $this->badge_icon, $this->name);
+        }
+    }
+
+    /**
+     * Claim reward for this achievement (for backwards compatibility with existing unclaimed achievements)
      */
     public function claimReward(User $user): bool
     {
@@ -120,15 +185,6 @@ class Achievement extends Model
             return false; // Reward already claimed
         }
 
-        // Check if user has a valid season pass for cash rewards
-        $seasonPass = null;
-        if ($this->season_id) {
-            $seasonPass = $user->seasonPasses()
-                ->where('season_id', $this->season_id)
-                ->where('is_active', true)
-                ->first();
-        }
-
         DB::beginTransaction();
         try {
             // Mark reward as claimed
@@ -137,47 +193,8 @@ class Achievement extends Model
                 'reward_claimed_at' => now(),
             ]);
 
-            // Calculate cash reward based on season pass tier (only if they have a pass)
-            $cashReward = 0;
-            if ($this->wallet_reward > 0 && $seasonPass) {
-                $cashReward = $seasonPass->calculateReward($this->wallet_reward);
-
-                if ($cashReward > 0) {
-                    $user->increment('wallet_balance', $cashReward);
-
-                    // Also update the Wallet model balance
-                    $wallet = $user->wallet;
-                    if ($wallet) {
-                        $wallet->increment('balance', $cashReward);
-
-                        // Create transaction record
-                        $wallet->transactions()->create([
-                            'user_id' => $user->id,
-                            'type' => 'achievement',
-                            'amount' => $cashReward,
-                            'status' => 'completed',
-                            'description' => "Achievement reward: {$this->name} ({$seasonPass->getTierDisplayName()} Pass)",
-                        ]);
-                    }
-                }
-            }
-
-            // Award achievement points (ALL users get points, even without a season pass)
-            $pointsToAward = $this->points;
-            if (!$pointsToAward && $this->tier) {
-                // Fallback to config if not set on achievement
-                $pointValues = config('achievements.point_values', []);
-                $pointsToAward = $pointValues[$this->tier] ?? 0;
-            }
-
-            if ($pointsToAward > 0) {
-                $user->increment('achievement_points', $pointsToAward);
-            }
-
-            // Grant badge if this is a badge-granting achievement
-            if ($this->grants_badge && $this->badge_icon) {
-                $user->addBadge($this->slug, $this->badge_icon, $this->name);
-            }
+            // Award rewards using the same logic as auto-claim
+            $this->awardRewards($user);
 
             DB::commit();
             return true;
