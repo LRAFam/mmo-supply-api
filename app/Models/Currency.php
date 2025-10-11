@@ -21,6 +21,8 @@ class Currency extends Model
         'min_amount',
         'max_amount',
         'bulk_pricing',
+        'currency_stock_amount',
+        'price_per_million',
         'images',
         'tags',
         'delivery_method',
@@ -43,6 +45,7 @@ class Currency extends Model
         'price_per_unit' => 'decimal:2',
         'discount_price' => 'decimal:2',
         'rate' => 'decimal:2',
+        'price_per_million' => 'decimal:2',
         'featured_until' => 'datetime',
     ];
 
