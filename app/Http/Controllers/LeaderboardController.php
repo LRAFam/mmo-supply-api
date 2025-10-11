@@ -137,21 +137,20 @@ class LeaderboardController extends Controller
 
     /**
      * Get reward structure for period
-     * Scales with platform revenue (2% of platform fees for the period)
+     * Scales with platform sales (5% of total sales for the period)
      */
     private function getRewardStructure(string $period): array
     {
-        // Calculate platform revenue for the current period
-        $dates = $this->getPeriodDates($period);
+        $baseAmount = $period === 'weekly' ? 10 : 50;
 
-        // Get total platform fees collected during this period
-        $platformRevenue = \DB::table('orders')
-            ->where('payment_status', 'completed')
-            ->whereBetween('created_at', [$dates['start'], $dates['end']])
-            ->sum(\DB::raw('platform_fee'));
+        // Get total sales from all sellers in the current period
+        $totalSales = User::where('is_seller', true)
+            ->where('monthly_sales', '>', 0)
+            ->sum('monthly_sales');
 
-        // Allocate 2% of platform revenue to prize pool (or minimum base amount)
-        $prizePool = max($platformRevenue * 0.02, $period === 'weekly' ? 10 : 50);
+        // Allocate 5% of total sales to prize pool
+        // For $1100 in sales: prize pool = $55
+        $prizePool = max($totalSales * 0.05, $baseAmount);
 
         if ($period === 'weekly') {
             // Weekly distribution: 50%, 25%, 10%, 15% for ranks 4-10

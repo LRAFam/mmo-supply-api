@@ -22,6 +22,9 @@ class SeasonController extends Controller
             ], 404);
         }
 
+        // Calculate dynamic prize pool based on platform revenue
+        $dynamicPrizePool = $this->calculateDynamicPrizePool('monthly');
+
         return response()->json([
             'id' => $season->id,
             'season_number' => $season->season_number,
@@ -30,7 +33,7 @@ class SeasonController extends Controller
             'start_date' => $season->start_date,
             'end_date' => $season->end_date,
             'status' => $season->status,
-            'prize_pool' => $season->prize_pool,
+            'prize_pool' => $dynamicPrizePool,
             'features' => $season->features,
             'days_remaining' => $season->daysRemaining(),
         ]);
@@ -149,5 +152,23 @@ class SeasonController extends Controller
             });
 
         return response()->json($participations);
+    }
+
+    /**
+     * Calculate dynamic prize pool based on platform sales
+     * Allocates 5% of total sales to the prize pool
+     */
+    private function calculateDynamicPrizePool(string $period = 'monthly'): float
+    {
+        $baseAmount = $period === 'weekly' ? 10 : 50;
+
+        // Get total sales from all sellers in the current period
+        $totalSales = User::where('is_seller', true)
+            ->where('monthly_sales', '>', 0)
+            ->sum('monthly_sales');
+
+        // Allocate 5% of total sales to prize pool
+        // For $1100 in sales: prize pool = $55
+        return max($totalSales * 0.05, $baseAmount);
     }
 }
