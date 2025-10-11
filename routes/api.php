@@ -47,6 +47,7 @@ Route::get('/leaderboard', [LeaderboardController::class, 'index']);
 
 // Public user profile (no auth required)
 Route::get('/users/{username}/public', [UserController::class, 'showPublic']);
+Route::get('/users/{user}', [UserController::class, 'show']);
 
 // Discord Bot API Routes (protected with custom middleware)
 Route::prefix('discord-bot')->middleware('discord.bot')->group(function () {
@@ -71,8 +72,6 @@ Route::middleware(['auth:sanctum'])->prefix('users')->name('users.')->group(func
     Route::get('/provider-games', [UserController::class, 'getProviderGames'])->name('providerGames');
     Route::post('/provider-games', [UserController::class, 'addProviderGame'])->name('addProviderGame');
     Route::delete('/provider-games/{providerId}', [UserController::class, 'removeProviderGame'])->name('removeProviderGame');
-    // This wildcard route must be last to avoid catching specific routes above
-    Route::get('/{user}', [UserController::class, 'show'])->name('show');
 });
 
 Route::middleware(["auth:sanctum"])->prefix("stripe")->name("stripe.")->group(function () {
