@@ -37,6 +37,7 @@ return Application::configure(basePath: dirname(__DIR__))
         // Register custom middleware aliases
         $middleware->alias([
             'discord.bot' => \App\Http\Middleware\DiscordBotAuth::class,
+            'admin' => \App\Http\Middleware\EnsureUserIsAdmin::class,
         ]);
 
         // Return JSON error for unauthenticated API requests instead of redirect

@@ -195,14 +195,12 @@ Route::middleware('auth:sanctum')->group(function () {
 
 });
 
-// Image uploads (accessible without Sanctum auth for Filament admin)
-Route::post('/upload/image', [UploadController::class, 'uploadImage']);
-Route::post('/upload/images', [UploadController::class, 'uploadMultipleImages']);
-Route::post('/upload/game-logo', [UploadController::class, 'uploadGameLogo']);
-Route::post('/upload/game-icon', [UploadController::class, 'uploadGameIcon']);
-
-// Authenticated file deletion
+// Image uploads (require authentication)
 Route::middleware('auth:sanctum')->group(function () {
+    Route::post('/upload/image', [UploadController::class, 'uploadImage']);
+    Route::post('/upload/images', [UploadController::class, 'uploadMultipleImages']);
+    Route::post('/upload/game-logo', [UploadController::class, 'uploadGameLogo']);
+    Route::post('/upload/game-icon', [UploadController::class, 'uploadGameIcon']);
     Route::delete('/upload/image', [UploadController::class, 'deleteImage']);
 });
 
@@ -222,8 +220,8 @@ Route::get('/featured-listings/active', [FeaturedListingController::class, 'getA
 Route::post('/referrals/validate', [ReferralController::class, 'validateCode']);
 Route::get('/referrals/leaderboard', [ReferralController::class, 'getLeaderboard']);
 
-// Admin routes (TODO: Add admin middleware)
-Route::middleware('auth:sanctum')->prefix('admin')->group(function () {
+// Admin routes (protected with admin middleware)
+Route::middleware(['auth:sanctum', 'admin'])->prefix('admin')->group(function () {
     Route::get('/sellers/custom-earnings', [AdminController::class, 'getCustomEarningsSellers']);
     Route::post('/sellers/{userId}/earnings', [AdminController::class, 'setSellerEarnings']);
     Route::delete('/sellers/{userId}/earnings', [AdminController::class, 'resetSellerEarnings']);

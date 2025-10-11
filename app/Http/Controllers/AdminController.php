@@ -14,8 +14,6 @@ class AdminController extends Controller
      */
     public function setSellerEarnings(Request $request, $userId): JsonResponse
     {
-        // TODO: Add admin middleware check
-
         $request->validate([
             'earnings_percentage' => 'required|numeric|min:0|max:100',
             'tier' => 'required|in:standard,partner,elite',
@@ -50,8 +48,6 @@ class AdminController extends Controller
      */
     public function getCustomEarningsSellers(): JsonResponse
     {
-        // TODO: Add admin middleware check
-
         $sellers = User::where('is_seller', true)
             ->whereNotNull('seller_earnings_percentage')
             ->select('id', 'name', 'email', 'seller_earnings_percentage', 'seller_tier')
@@ -75,8 +71,6 @@ class AdminController extends Controller
      */
     public function resetSellerEarnings($userId): JsonResponse
     {
-        // TODO: Add admin middleware check
-
         $user = User::findOrFail($userId);
 
         $user->update([
@@ -100,8 +94,6 @@ class AdminController extends Controller
      */
     public function grantSubscription(Request $request, $userId): JsonResponse
     {
-        // TODO: Add admin middleware check
-
         $request->validate([
             'tier' => 'required|in:premium,elite',
             'duration_days' => 'required|integer|min:1|max:365',
