@@ -32,7 +32,9 @@ use App\Http\Controllers\UploadController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\UserStatsController;
 use App\Http\Controllers\WalletController;
-use App\Http\Controllers\CryptoPaymentController;use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\CryptoPaymentController;
+use App\Http\Controllers\PayPalPayoutController;
+use Illuminate\Support\Facades\Route;
 use Illuminate\Http\Request;
 
 Route::middleware('auth:sanctum')->get('/user', [UserController::class, 'me']);
@@ -338,6 +340,16 @@ Route::middleware(['auth:sanctum'])->prefix('crypto')->name('crypto.')->group(fu
 // Crypto webhooks (no auth required)
 Route::post('/crypto/webhook', [CryptoPaymentController::class, 'handleWebhook']);
 Route::post('/crypto/payout-webhook', [CryptoPaymentController::class, 'handleWebhook']);
+
+// PayPal payout routes
+Route::middleware(['auth:sanctum'])->prefix('payouts')->name('payouts.')->group(function () {
+    Route::post('/paypal', [PayPalPayoutController::class, 'createPayout']);
+    Route::get('/paypal/history', [PayPalPayoutController::class, 'getPayouts']);
+    Route::get('/paypal/{payoutBatchId}/status', [PayPalPayoutController::class, 'getPayoutStatus']);
+});
+
+// PayPal webhooks (no auth required)
+Route::post('/paypal/webhook', [PayPalPayoutController::class, 'handleWebhook']);
 
 // Season Pass routes
 Route::middleware(['auth:sanctum'])->prefix('season-pass')->group(function () {
