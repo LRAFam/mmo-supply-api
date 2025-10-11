@@ -116,7 +116,7 @@ class AdvertisementController extends Controller
             'title' => 'required|string|max:255',
             'description' => 'nullable|string',
             'link_url' => 'required|url',
-            'image' => 'required|image|max:2048',
+            'image' => 'required|image|max:10240', // 10MB max for high-quality banners
             'placement' => 'required|in:homepage_top,homepage_sidebar,marketplace_top,marketplace_sidebar,game_page_top',
             'duration' => 'required|integer|in:7,14,30',
             'payment_method' => 'required|in:stripe,wallet',
