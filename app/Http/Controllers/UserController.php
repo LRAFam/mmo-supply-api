@@ -22,6 +22,13 @@ class UserController extends Controller
                 'id' => $user->id,
                 'name' => $user->name,
                 'email' => $user->email,
+                'bio' => $user->bio,
+                'avatar' => $user->avatar,
+                'banner' => $user->banner,
+                'active_title' => $user->active_title,
+                'active_profile_theme' => $user->active_profile_theme,
+                'owned_cosmetics' => $user->owned_cosmetics ?? [],
+                'badge_inventory' => $user->badge_inventory ?? [],
                 'email_verified_at' => $user->email_verified_at,
                 'created_at' => $user->created_at,
                 'is_seller' => (bool) $user->is_seller,
@@ -60,10 +67,16 @@ class UserController extends Controller
             'name' => 'sometimes|string|max:255',
             'email' => 'sometimes|email|max:255|unique:users,email,' . $user->id,
             'bio' => 'nullable|string|max:1000',
-            'avatar' => 'nullable|string|max:255',
+            'avatar' => 'nullable|string|max:500',
+            'banner' => 'nullable|string|max:500',
+            'active_title' => 'nullable|string|max:100',
+            'active_profile_theme' => 'nullable|string|max:100',
         ]);
 
         $user->update($validated);
+
+        // Refresh user to get updated data
+        $user->refresh();
 
         return response()->json([
             'success' => true,
@@ -74,6 +87,11 @@ class UserController extends Controller
                 'email' => $user->email,
                 'bio' => $user->bio,
                 'avatar' => $user->avatar,
+                'banner' => $user->banner,
+                'active_title' => $user->active_title,
+                'active_profile_theme' => $user->active_profile_theme,
+                'owned_cosmetics' => $user->owned_cosmetics ?? [],
+                'badge_inventory' => $user->badge_inventory ?? [],
                 'email_verified_at' => $user->email_verified_at,
                 'created_at' => $user->created_at,
                 'is_seller' => (bool) $user->is_seller,
