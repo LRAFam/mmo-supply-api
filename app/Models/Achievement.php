@@ -120,17 +120,13 @@ class Achievement extends Model
             return false; // Reward already claimed
         }
 
-        // Check if user has a valid season pass for this achievement
+        // Check if user has a valid season pass for cash rewards
         $seasonPass = null;
         if ($this->season_id) {
             $seasonPass = $user->seasonPasses()
                 ->where('season_id', $this->season_id)
                 ->where('is_active', true)
                 ->first();
-
-            if (!$seasonPass) {
-                return false; // No active season pass
-            }
         }
 
         DB::beginTransaction();
@@ -141,7 +137,7 @@ class Achievement extends Model
                 'reward_claimed_at' => now(),
             ]);
 
-            // Calculate cash reward based on season pass tier
+            // Calculate cash reward based on season pass tier (only if they have a pass)
             $cashReward = 0;
             if ($this->wallet_reward > 0 && $seasonPass) {
                 $cashReward = $seasonPass->calculateReward($this->wallet_reward);
@@ -166,7 +162,7 @@ class Achievement extends Model
                 }
             }
 
-            // Award achievement points (all users get points, regardless of pass tier)
+            // Award achievement points (ALL users get points, even without a season pass)
             $pointsToAward = $this->points;
             if (!$pointsToAward && $this->tier) {
                 // Fallback to config if not set on achievement
