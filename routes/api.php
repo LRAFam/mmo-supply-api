@@ -98,11 +98,11 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/cart/remove', [CartController::class, 'remove']);
     Route::post('/cart/update', [CartController::class, 'update']);
 
-    // Orders
+    // Orders (rate limit order creation to prevent spam)
     Route::get('/orders', [OrderController::class, 'index']);
     Route::get('/orders/seller/all', [OrderController::class, 'sellerOrders']);
     Route::get('/orders/{id}', [OrderController::class, 'show']);
-    Route::post('/orders', [OrderController::class, 'store']);
+    Route::middleware('throttle:30,1')->post('/orders', [OrderController::class, 'store']);
     Route::put('/orders/{id}/status', [OrderController::class, 'updateStatus']);
     Route::post('/orders/{orderId}/items/{itemId}/deliver', [OrderController::class, 'deliverItem']);
     Route::post('/orders/{orderId}/items/{itemId}/confirm-delivery', [OrderController::class, 'confirmDelivery']);
@@ -114,11 +114,11 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::put('/reviews/{id}', [ReviewController::class, 'update']);
     Route::delete('/reviews/{id}', [ReviewController::class, 'destroy']);
 
-    // Wallet
+    // Wallet (rate limit financial operations to prevent abuse)
     Route::get('/wallet', [WalletController::class, 'show']);
     Route::get('/wallet/transactions', [WalletController::class, 'transactions']);
-    Route::post('/wallet/deposit', [WalletController::class, 'deposit']);
-    Route::post('/wallet/withdraw', [WalletController::class, 'requestWithdrawal']);
+    Route::middleware('throttle:20,1')->post('/wallet/deposit', [WalletController::class, 'deposit']);
+    Route::middleware('throttle:10,1')->post('/wallet/withdraw', [WalletController::class, 'requestWithdrawal']);
     Route::get('/wallet/withdrawals', [WalletController::class, 'withdrawalRequests']);
     Route::post('/wallet/withdrawals/{id}/cancel', [WalletController::class, 'cancelWithdrawal']);
 
@@ -195,8 +195,8 @@ Route::middleware('auth:sanctum')->group(function () {
 
 });
 
-// Image uploads (require authentication)
-Route::middleware('auth:sanctum')->group(function () {
+// Image uploads (require authentication with rate limiting)
+Route::middleware(['auth:sanctum', 'throttle:60,1'])->group(function () {
     Route::post('/upload/image', [UploadController::class, 'uploadImage']);
     Route::post('/upload/images', [UploadController::class, 'uploadMultipleImages']);
     Route::post('/upload/game-logo', [UploadController::class, 'uploadGameLogo']);
@@ -308,17 +308,22 @@ Route::group(['prefix' => 'providers'], function () {
 Route::prefix('auth')->group(function () {
     Route::get('discord', [AuthController::class, 'redirectToProvider']);
     Route::get('discord/callback', [AuthController::class, 'handleProviderCallback']);
-    Route::post('register', [AuthController::class, 'register']);
-    Route::post('login', [AuthController::class, 'login']);
+
+    // Rate limit authentication endpoints to prevent brute force attacks
+    Route::middleware('throttle:10,1')->group(function () {
+        Route::post('register', [AuthController::class, 'register']);
+        Route::post('login', [AuthController::class, 'login']);
+        Route::post('forgot-password', [AuthController::class, 'forgotPassword']);
+        Route::post('reset-password', [AuthController::class, 'resetPassword']);
+    });
+
     Route::post('logout', [AuthController::class, 'logout'])->middleware('auth:sanctum');
 
-    // Email verification
-    Route::post('verify-email', [AuthController::class, 'verifyEmail']);
-    Route::post('resend-verification', [AuthController::class, 'resendVerification']);
-
-    // Password reset
-    Route::post('forgot-password', [AuthController::class, 'forgotPassword']);
-    Route::post('reset-password', [AuthController::class, 'resetPassword']);
+    // Email verification (less strict rate limiting)
+    Route::middleware('throttle:20,1')->group(function () {
+        Route::post('verify-email', [AuthController::class, 'verifyEmail']);
+        Route::post('resend-verification', [AuthController::class, 'resendVerification']);
+    });
 });
 
 // Webhook route (no CSRF protection needed)
