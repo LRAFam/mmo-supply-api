@@ -210,6 +210,15 @@ abstract class BaseProductController extends Controller
             ]
         );
 
+        // Send Discord webhook notification
+        try {
+            $webhookService = new \App\Services\DiscordWebhookService();
+            $webhookService->sendNewListing($product->load(['user', 'game']), $productType->value);
+        } catch (\Exception $e) {
+            // Log but don't fail the request if webhook fails
+            \Log::error('Failed to send Discord webhook: ' . $e->getMessage());
+        }
+
         return response()->json($product, 201);
     }
 
