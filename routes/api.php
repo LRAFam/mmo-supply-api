@@ -32,6 +32,7 @@ use App\Http\Controllers\UploadController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\UserStatsController;
 use App\Http\Controllers\WalletController;
+use App\Http\Controllers\WishlistController;
 use App\Http\Controllers\CryptoPaymentController;
 use App\Http\Controllers\PayPalPayoutController;
 use Illuminate\Support\Facades\Route;
@@ -192,6 +193,13 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/referrals/list', [ReferralController::class, 'getReferrals']);
     Route::get('/referrals/earnings', [ReferralController::class, 'getEarnings']);
     Route::post('/referrals/apply', [ReferralController::class, 'applyReferralCode']);
+
+    // Wishlist
+    Route::get('/wishlist', [WishlistController::class, 'index']);
+    Route::post('/wishlist', [WishlistController::class, 'store']);
+    Route::delete('/wishlist/{id}', [WishlistController::class, 'destroy']);
+    Route::post('/wishlist/check', [WishlistController::class, 'check']);
+    Route::post('/wishlist/toggle', [WishlistController::class, 'toggle']);
 
 });
 
