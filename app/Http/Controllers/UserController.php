@@ -22,6 +22,7 @@ class UserController extends Controller
                 'id' => $user->id,
                 'name' => $user->name,
                 'email' => $user->email,
+                'email_visible' => (bool) $user->email_visible,
                 'bio' => $user->bio,
                 'avatar' => $user->avatar,
                 'banner' => $user->banner,
@@ -66,6 +67,7 @@ class UserController extends Controller
         $validated = $request->validate([
             'name' => 'sometimes|string|max:255',
             'email' => 'sometimes|email|max:255|unique:users,email,' . $user->id,
+            'email_visible' => 'sometimes|boolean',
             'bio' => 'nullable|string|max:1000',
             'avatar' => 'nullable|string|max:500',
             'banner' => 'nullable|string|max:500',
@@ -85,6 +87,7 @@ class UserController extends Controller
                 'id' => $user->id,
                 'name' => $user->name,
                 'email' => $user->email,
+                'email_visible' => (bool) $user->email_visible,
                 'bio' => $user->bio,
                 'avatar' => $user->avatar,
                 'banner' => $user->banner,
@@ -115,6 +118,10 @@ class UserController extends Controller
         if (!$user) {
             return response()->json(['error' => 'User not found'], 404);
         }
+
+        // Check if viewing own profile or is admin
+        $authUser = auth('sanctum')->user();
+        $canSeeEmail = $authUser && ($authUser->id === $user->id || $authUser->role === 'admin') || $user->email_visible;
 
         // Get seller stats
         $sellerStats = null;
@@ -270,27 +277,34 @@ class UserController extends Controller
                 ->values();
         }
 
+        $userData = [
+            'id' => $user->id,
+            'name' => $user->name,
+            'avatar' => $user->avatar,
+            'banner' => $user->banner,
+            'bio' => $user->bio,
+            'is_seller' => (bool) $user->is_seller,
+            'subscription_tier' => $user->getSubscriptionTier(),
+            'created_at' => $user->created_at,
+            // Cosmetics
+            'owned_cosmetics' => $user->owned_cosmetics ?? [],
+            'badge_inventory' => $user->badge_inventory ?? [],
+            'active_profile_theme' => $user->active_profile_theme,
+            'active_title' => $user->active_title,
+            // Stats
+            'achievement_points' => $user->achievement_points ?? 0,
+            'total_achievements' => $achievements->count(),
+            'seller_stats' => $sellerStats,
+        ];
+
+        // Only include email if allowed
+        if ($canSeeEmail) {
+            $userData['email'] = $user->email;
+        }
+
         return response()->json([
             'success' => true,
-            'user' => [
-                'id' => $user->id,
-                'name' => $user->name,
-                'avatar' => $user->avatar,
-                'banner' => $user->banner,
-                'bio' => $user->bio,
-                'is_seller' => (bool) $user->is_seller,
-                'subscription_tier' => $user->getSubscriptionTier(),
-                'created_at' => $user->created_at,
-                // Cosmetics
-                'owned_cosmetics' => $user->owned_cosmetics ?? [],
-                'badge_inventory' => $user->badge_inventory ?? [],
-                'active_profile_theme' => $user->active_profile_theme,
-                'active_title' => $user->active_title,
-                // Stats
-                'achievement_points' => $user->achievement_points ?? 0,
-                'total_achievements' => $achievements->count(),
-                'seller_stats' => $sellerStats,
-            ],
+            'user' => $userData,
             'achievements' => $achievements,
             'reviews' => $recentReviews,
             'products' => $products,
@@ -308,7 +322,11 @@ class UserController extends Controller
             return response()->json(['error' => 'User not found'], 404);
         }
 
-        return response()->json([
+        // Check if viewing own profile or is admin
+        $authUser = auth('sanctum')->user();
+        $canSeeEmail = $authUser && ($authUser->id === $user->id || $authUser->role === 'admin') || $user->email_visible;
+
+        $userData = [
             'id' => $user->id,
             'name' => $user->name,
             'avatar' => $user->avatar,
@@ -320,7 +338,14 @@ class UserController extends Controller
             'monthly_sales' => $user->monthly_sales ?? 0,
             'total_referrals' => $user->total_referrals ?? 0,
             'created_at' => $user->created_at,
-        ]);
+        ];
+
+        // Only include email if allowed
+        if ($canSeeEmail) {
+            $userData['email'] = $user->email;
+        }
+
+        return response()->json($userData);
     }
 
     /**
