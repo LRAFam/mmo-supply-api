@@ -260,6 +260,53 @@ class Achievement extends Model
                     $accountAge = now()->diffInDays($user->created_at);
                     if ($accountAge < $value) return false;
                     break;
+
+                case 'wishlist_items':
+                    $wishlistCount = DB::table('wishlists')->where('user_id', $user->id)->count();
+                    if ($wishlistCount < $value) return false;
+                    break;
+
+                case 'daily_spins_count':
+                    $dailySpins = DB::table('spin_history')
+                        ->where('user_id', $user->id)
+                        ->where('spin_type', 'daily')
+                        ->count();
+                    if ($dailySpins < $value) return false;
+                    break;
+
+                case 'premium_spins_count':
+                    $premiumSpins = DB::table('spin_history')
+                        ->where('user_id', $user->id)
+                        ->where('spin_type', 'premium')
+                        ->count();
+                    if ($premiumSpins < $value) return false;
+                    break;
+
+                case 'login_streak_days':
+                    $currentStreak = $user->login_streak ?? 0;
+                    if ($currentStreak < $value) return false;
+                    break;
+
+                case 'total_spins':
+                    $totalSpins = DB::table('spin_history')->where('user_id', $user->id)->count();
+                    if ($totalSpins < $value) return false;
+                    break;
+
+                case 'consecutive_spin_wins':
+                    // This would need more complex logic to track consecutive wins
+                    // For now, return false to prevent auto-unlock
+                    return false;
+
+                case 'max_spin_win':
+                    $maxWin = DB::table('spin_history')
+                        ->where('user_id', $user->id)
+                        ->max('amount') ?? 0;
+                    if ($maxWin < $value) return false;
+                    break;
+
+                default:
+                    // Unknown requirement type - fail safe by returning false
+                    return false;
             }
         }
 
@@ -341,7 +388,38 @@ class Achievement extends Model
                 case 'account_age_days':
                     $current = abs(now()->diffInDays($user->created_at));
                     break;
+                case 'wishlist_items':
+                    $current = DB::table('wishlists')->where('user_id', $user->id)->count();
+                    break;
+                case 'daily_spins_count':
+                    $current = DB::table('spin_history')
+                        ->where('user_id', $user->id)
+                        ->where('spin_type', 'daily')
+                        ->count();
+                    break;
+                case 'premium_spins_count':
+                    $current = DB::table('spin_history')
+                        ->where('user_id', $user->id)
+                        ->where('spin_type', 'premium')
+                        ->count();
+                    break;
+                case 'login_streak_days':
+                    $current = $user->login_streak ?? 0;
+                    break;
+                case 'total_spins':
+                    $current = DB::table('spin_history')->where('user_id', $user->id)->count();
+                    break;
+                case 'max_spin_win':
+                    $current = DB::table('spin_history')
+                        ->where('user_id', $user->id)
+                        ->max('amount') ?? 0;
+                    break;
+                case 'consecutive_spin_wins':
+                    // Complex calculation - skip for now
+                    $current = 0;
+                    break;
                 default:
+                    // Unknown requirement type - skip and continue
                     continue 2;
             }
 
