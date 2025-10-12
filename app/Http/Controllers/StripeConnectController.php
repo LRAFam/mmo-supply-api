@@ -127,7 +127,7 @@ class StripeConnectController extends Controller
     /**
      * Create a login link to Stripe Express Dashboard
      */
-    public function createDashboardLink()
+    public function createDashboardLink(Request $request)
     {
         $user = Auth::user();
 
@@ -139,6 +139,27 @@ class StripeConnectController extends Controller
         }
 
         try {
+            // First, check if the account has completed onboarding
+            $account = Account::retrieve($user->stripe_account_id);
+
+            // If account hasn't completed onboarding, return an onboarding link instead
+            if (!$account->details_submitted) {
+                $accountLink = AccountLink::create([
+                    'account' => $user->stripe_account_id,
+                    'refresh_url' => $request->input('refresh_url', config('app.frontend_url') . '/seller/stripe/refresh'),
+                    'return_url' => $request->input('return_url', config('app.frontend_url') . '/seller/stripe/return'),
+                    'type' => 'account_onboarding',
+                ]);
+
+                return response()->json([
+                    'success' => true,
+                    'url' => $accountLink->url,
+                    'onboarding_incomplete' => true,
+                    'message' => 'Please complete your Stripe onboarding first',
+                ]);
+            }
+
+            // Account is fully onboarded, create dashboard login link
             $loginLink = Account::createLoginLink($user->stripe_account_id);
 
             return response()->json([

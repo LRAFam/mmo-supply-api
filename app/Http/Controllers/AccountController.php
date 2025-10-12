@@ -45,10 +45,10 @@ class AccountController extends BaseProductController
      * Apply custom filters specific to Account products
      *
      * @param \Illuminate\Database\Eloquent\Builder $query
-     * @param Request $request
+     * @param \Illuminate\Http\Request $request
      * @return void
      */
-    protected function applyCustomFilters($query, Request $request): void
+    protected function applyCustomFilters($query, \Illuminate\Http\Request $request): void
     {
         // Filter by account level
         if ($request->has('min_level')) {
