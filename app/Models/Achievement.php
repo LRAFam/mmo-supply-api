@@ -268,16 +268,18 @@ class Achievement extends Model
 
                 case 'daily_spins_count':
                     $dailySpins = DB::table('spin_results')
-                        ->where('user_id', $user->id)
-                        ->where('spin_type', 'daily')
+                        ->join('spin_wheels', 'spin_results.spin_wheel_id', '=', 'spin_wheels.id')
+                        ->where('spin_results.user_id', $user->id)
+                        ->where('spin_wheels.type', 'free')
                         ->count();
                     if ($dailySpins < $value) return false;
                     break;
 
                 case 'premium_spins_count':
                     $premiumSpins = DB::table('spin_results')
-                        ->where('user_id', $user->id)
-                        ->where('spin_type', 'premium')
+                        ->join('spin_wheels', 'spin_results.spin_wheel_id', '=', 'spin_wheels.id')
+                        ->where('spin_results.user_id', $user->id)
+                        ->where('spin_wheels.type', 'premium')
                         ->count();
                     if ($premiumSpins < $value) return false;
                     break;
@@ -300,7 +302,7 @@ class Achievement extends Model
                 case 'max_spin_win':
                     $maxWin = DB::table('spin_results')
                         ->where('user_id', $user->id)
-                        ->max('amount') ?? 0;
+                        ->max('prize_value') ?? 0;
                     if ($maxWin < $value) return false;
                     break;
 
@@ -393,14 +395,16 @@ class Achievement extends Model
                     break;
                 case 'daily_spins_count':
                     $current = DB::table('spin_results')
-                        ->where('user_id', $user->id)
-                        ->where('spin_type', 'daily')
+                        ->join('spin_wheels', 'spin_results.spin_wheel_id', '=', 'spin_wheels.id')
+                        ->where('spin_results.user_id', $user->id)
+                        ->where('spin_wheels.type', 'free')
                         ->count();
                     break;
                 case 'premium_spins_count':
                     $current = DB::table('spin_results')
-                        ->where('user_id', $user->id)
-                        ->where('spin_type', 'premium')
+                        ->join('spin_wheels', 'spin_results.spin_wheel_id', '=', 'spin_wheels.id')
+                        ->where('spin_results.user_id', $user->id)
+                        ->where('spin_wheels.type', 'premium')
                         ->count();
                     break;
                 case 'login_streak_days':
@@ -412,7 +416,7 @@ class Achievement extends Model
                 case 'max_spin_win':
                     $current = DB::table('spin_results')
                         ->where('user_id', $user->id)
-                        ->max('amount') ?? 0;
+                        ->max('prize_value') ?? 0;
                     break;
                 case 'consecutive_spin_wins':
                     // Complex calculation - skip for now
