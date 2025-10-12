@@ -36,6 +36,7 @@ class DiscordWebhookService
                     'price' => $listing->price,
                     'stock' => $listing->stock ?? null,
                     'image_url' => $listing->image_url ?? null,
+                    'is_featured' => $listing->is_featured ?? false,
                 ],
                 'game' => [
                     'id' => $listing->game->id,

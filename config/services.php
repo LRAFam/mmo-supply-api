@@ -28,11 +28,6 @@ return [
         'key' => env('RESEND_API_KEY'),
     ],
 
-    'discord' => [
-        'webhook_url' => env('DISCORD_WEBHOOK_URL', 'http://localhost:3001/webhooks'),
-        'webhook_secret' => env('DISCORD_WEBHOOK_SECRET'),
-    ],
-
     'slack' => [
         'notifications' => [
             'bot_user_oauth_token' => env('SLACK_BOT_USER_OAUTH_TOKEN'),
@@ -45,6 +40,8 @@ return [
         'client_secret' => env('DISCORD_CLIENT_SECRET'),
         'redirect' => env('DISCORD_REDIRECT_URI'),
         'bot_api_key' => env('DISCORD_BOT_API_KEY'),
+        'webhook_url' => env('DISCORD_WEBHOOK_URL', 'http://localhost:3001/webhooks'),
+        'webhook_secret' => env('DISCORD_WEBHOOK_SECRET'),
 
         // optional
         'allow_gif_avatars' => (bool)env('DISCORD_AVATAR_GIF', true),
