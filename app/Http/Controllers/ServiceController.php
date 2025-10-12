@@ -2,194 +2,39 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Service;
-use Illuminate\Http\Request;
-use Illuminate\Http\JsonResponse;
+use App\Enums\ProductType;
 
-class ServiceController extends Controller
+class ServiceController extends BaseProductController
 {
-    public function index(Request $request): JsonResponse
+    /**
+     * Get the ProductType enum for Service
+     *
+     * @return ProductType
+     */
+    protected function getProductType(): ProductType
     {
-        $query = Service::with(['user', 'game'])
-            ->where('is_active', true);
-
-        // Search by title
-        if ($request->has('search')) {
-            $query->where('title', 'like', '%' . $request->search . '%');
-        }
-
-        // Filter by game
-        if ($request->has('game_id')) {
-            $query->where('game_id', $request->game_id);
-        }
-
-        // Filter by price range
-        if ($request->has('min_price')) {
-            $query->where('price', '>=', $request->min_price);
-        }
-        if ($request->has('max_price')) {
-            $query->where('price', '<=', $request->max_price);
-        }
-
-        // Filter by featured
-        if ($request->has('featured')) {
-            $query->where('is_featured', $request->boolean('featured'));
-        }
-
-        // Sort
-        $sortBy = $request->get('sort_by', 'created_at');
-        $sortOrder = $request->get('sort_order', 'desc');
-        $query->orderBy($sortBy, $sortOrder);
-
-        $services = $query->paginate($request->get('per_page', 20));
-
-        return response()->json($services);
+        return ProductType::SERVICE;
     }
 
-    public function show($id): JsonResponse
+    /**
+     * Get validation rules specific to Service products
+     *
+     * @param bool $isUpdate Whether these rules are for an update operation
+     * @return array
+     */
+    protected function getValidationRules(bool $isUpdate = false): array
     {
-        $service = Service::with(['user', 'game', 'reviews.user'])->findOrFail($id);
-        return response()->json($service);
-    }
+        $rule = $isUpdate ? 'sometimes' : 'required';
 
-    public function similar($id): JsonResponse
-    {
-        $similarService = new \App\Services\SimilarListingsService();
-        $similar = $similarService->findSimilar('service', $id);
-
-        return response()->json([
-            'similar_listings' => $similar
-        ]);
-    }
-
-    public function store(Request $request): JsonResponse
-    {
-        $validated = $request->validate([
-            'game_id' => 'required|exists:games,id',
-            'title' => 'required|string|max:255',
-            'description' => 'required|string',
-            'price' => 'nullable|numeric|min:0',
-            'discount_price' => 'nullable|numeric|min:0',
+        return array_merge($this->getCommonValidationRules($isUpdate), [
+            // Service-specific fields
             'estimated_time' => 'nullable|string',
-            'images' => 'nullable|array',
-            'images.*' => 'string',
-            'tags' => 'nullable|array',
-            'tags.*' => 'string',
             'packages' => 'nullable|array',
             'addons' => 'nullable|array',
             'schedule' => 'nullable|array',
             'max_concurrent_orders' => 'nullable|integer|min:1',
-            'delivery_method' => 'nullable|string',
-            'requirements' => 'nullable|string',
-            'warranty_days' => 'nullable|integer|min:0',
-            'refund_policy' => 'nullable|string',
-            'seo_title' => 'nullable|string|max:255',
-            'seo_description' => 'nullable|string|max:500',
-            'auto_deactivate' => 'nullable|boolean',
-            'is_featured' => 'nullable|boolean',
-            'featured_until' => 'nullable|date',
             'service_type' => 'nullable|string',
             'boosting_config' => 'nullable|array',
         ]);
-
-        $service = Service::create([
-            'user_id' => $request->user()->id,
-            'game_id' => $validated['game_id'],
-            'title' => $validated['title'],
-            'slug' => \Illuminate\Support\Str::slug($validated['title']) . '-' . uniqid(),
-            'description' => $validated['description'],
-            'price' => $validated['price'] ?? 0,
-            'discount_price' => $validated['discount_price'] ?? null,
-            'estimated_time' => $validated['estimated_time'] ?? null,
-            'images' => $validated['images'] ?? [],
-            'tags' => $validated['tags'] ?? [],
-            'packages' => $validated['packages'] ?? null,
-            'addons' => $validated['addons'] ?? null,
-            'schedule' => $validated['schedule'] ?? null,
-            'max_concurrent_orders' => $validated['max_concurrent_orders'] ?? 5,
-            'delivery_method' => $validated['delivery_method'] ?? null,
-            'requirements' => $validated['requirements'] ?? null,
-            'warranty_days' => $validated['warranty_days'] ?? 0,
-            'refund_policy' => $validated['refund_policy'] ?? null,
-            'seo_title' => $validated['seo_title'] ?? null,
-            'seo_description' => $validated['seo_description'] ?? null,
-            'auto_deactivate' => $validated['auto_deactivate'] ?? false,
-            'is_featured' => $validated['is_featured'] ?? false,
-            'featured_until' => $validated['featured_until'] ?? null,
-            'service_type' => $validated['service_type'] ?? 'standard',
-            'boosting_config' => $validated['boosting_config'] ?? null,
-            'is_active' => true,
-        ]);
-
-        // Create or update provider record for this user+game combination
-        \App\Models\Provider::firstOrCreate(
-            [
-                'user_id' => $request->user()->id,
-                'game_id' => $validated['game_id'],
-            ],
-            [
-                'vouches' => 0,
-                'rating' => 0,
-            ]
-        );
-
-        return response()->json($service, 201);
-    }
-
-    public function update(Request $request, $id): JsonResponse
-    {
-        $service = Service::findOrFail($id);
-
-        // Ensure user owns this service
-        if ($service->user_id !== $request->user()->id) {
-            return response()->json(['message' => 'Unauthorized'], 403);
-        }
-
-        $validated = $request->validate([
-            'game_id' => 'sometimes|exists:games,id',
-            'title' => 'sometimes|string|max:255',
-            'description' => 'sometimes|string',
-            'content' => 'nullable|string',
-            'price' => 'nullable|numeric|min:0',
-            'discount_price' => 'nullable|numeric|min:0',
-            'estimated_time' => 'nullable|string',
-            'images' => 'nullable|array',
-            'images.*' => 'string',
-            'tags' => 'nullable|array',
-            'tags.*' => 'string',
-            'packages' => 'nullable|array',
-            'addons' => 'nullable|array',
-            'schedule' => 'nullable|array',
-            'max_concurrent_orders' => 'nullable|integer|min:1',
-            'delivery_method' => 'nullable|string',
-            'requirements' => 'nullable|string',
-            'warranty_days' => 'nullable|integer|min:0',
-            'refund_policy' => 'nullable|string',
-            'seo_title' => 'nullable|string|max:255',
-            'seo_description' => 'nullable|string|max:500',
-            'auto_deactivate' => 'nullable|boolean',
-            'is_featured' => 'nullable|boolean',
-            'featured_until' => 'nullable|date',
-            'service_type' => 'nullable|string',
-            'boosting_config' => 'nullable|array',
-        ]);
-
-        $service->update($validated);
-
-        return response()->json($service);
-    }
-
-    public function destroy(Request $request, $id): JsonResponse
-    {
-        $service = Service::findOrFail($id);
-
-        // Ensure user owns this service
-        if ($service->user_id !== $request->user()->id) {
-            return response()->json(['message' => 'Unauthorized'], 403);
-        }
-
-        $service->delete();
-
-        return response()->json(['message' => 'Service deleted successfully']);
     }
 }

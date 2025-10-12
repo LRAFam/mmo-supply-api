@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\ProductType;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\Cart;
@@ -92,18 +93,15 @@ class OrderController extends Controller
                 $productId = $cartItem['product_id'];
                 $quantity = $cartItem['quantity'];
 
-                // Get the model class (handle both singular and plural)
-                $modelClass = match($productType) {
-                    'currency', 'currencies' => \App\Models\Currency::class,
-                    'item', 'items' => \App\Models\Item::class,
-                    'service', 'services' => \App\Models\Service::class,
-                    'account', 'accounts' => \App\Models\Account::class,
-                    default => null,
-                };
-
-                if (!$modelClass) {
+                // Get the model class using ProductType enum
+                $productTypeEnum = ProductType::tryFromString($productType);
+                if (!$productTypeEnum) {
                     continue;
                 }
+                $modelClass = $productTypeEnum->getModelClass();
+
+                // Normalize product_type to singular form
+                $normalizedProductType = $productTypeEnum->value;
 
                 $product = $modelClass::with('game')->find($productId);
 
@@ -111,11 +109,9 @@ class OrderController extends Controller
                     continue;
                 }
 
-                // Get price based on product type (handle both singular and plural)
-                $price = match($productType) {
-                    'currency', 'currencies' => floatval($product->price_per_unit ?? 0),
-                    default => floatval($product->price ?? 0),
-                };
+                // Get price based on product type using enum
+                $priceField = $productTypeEnum->getPriceField();
+                $price = floatval($product->{$priceField} ?? 0);
 
                 $discount = floatval($product->discount ?? 0);
                 $itemTotal = $quantity * ($price - $discount);
@@ -123,7 +119,7 @@ class OrderController extends Controller
 
                 $orderItems[] = [
                     'seller_id' => $product->user_id,
-                    'product_type' => $productType,
+                    'product_type' => $normalizedProductType,
                     'product_id' => $product->id,
                     'product_name' => $product->name ?? $product->title ?? 'Unknown',
                     'product_description' => $product->description ?? '',
@@ -441,6 +437,18 @@ class OrderController extends Controller
         // Track sale for tier progression
         $seller->addSale($orderItem->total);
 
+        // Update provider stats for this game
+        $gameId = null;
+        if ($orderItem->product_type && $orderItem->product_id) {
+            $productTypeEnum = ProductType::tryFromString($orderItem->product_type);
+            if ($productTypeEnum) {
+                $modelClass = $productTypeEnum->getModelClass();
+                $product = $modelClass::find($orderItem->product_id);
+                $gameId = $product->game_id ?? null;
+            }
+        }
+        $this->updateProviderStats($seller->id, $gameId, $orderItem);
+
         // Check for seller achievements after funds released
         $achievementService = app(AchievementCheckService::class);
         $achievementService->checkAndAutoClaimAchievements($seller);
@@ -449,6 +457,45 @@ class OrderController extends Controller
         $orderItem->funds_released = true;
         $orderItem->funds_released_at = now();
         $orderItem->save();
+    }
+
+    /**
+     * Update provider stats (total_sales, rating calculation)
+     */
+    private function updateProviderStats(int $sellerId, ?int $gameId, $orderItem): void
+    {
+        if (!$gameId) {
+            return;
+        }
+
+        // Find or create provider record for this seller-game combination
+        $provider = \App\Models\Provider::firstOrCreate(
+            [
+                'user_id' => $sellerId,
+                'game_id' => $gameId,
+            ],
+            [
+                'vouches' => 0,
+                'rating' => 0,
+                'total_sales' => 0,
+                'is_verified' => false,
+            ]
+        );
+
+        // Increment total_sales
+        $provider->increment('total_sales');
+
+        // Recalculate rating from reviews
+        $averageRating = \App\Models\Review::whereHas('orderItem', function ($query) use ($sellerId, $gameId) {
+            $query->where('seller_id', $sellerId)
+                  ->whereHas('product', function ($q) use ($gameId) {
+                      $q->where('game_id', $gameId);
+                  });
+        })->avg('rating');
+
+        if ($averageRating !== null) {
+            $provider->update(['rating' => round($averageRating, 2)]);
+        }
     }
 
     public function updateStatus(Request $request, $id): JsonResponse
@@ -545,15 +592,9 @@ class OrderController extends Controller
                 // Restore stock for all items
                 foreach ($order->items as $item) {
                     // Get the product and restore stock
-                    $modelClass = match($item->product_type) {
-                        'currency', 'currencies' => \App\Models\Currency::class,
-                        'item', 'items' => \App\Models\Item::class,
-                        'service', 'services' => \App\Models\Service::class,
-                        'account', 'accounts' => \App\Models\Account::class,
-                        default => null,
-                    };
-
-                    if ($modelClass) {
+                    $productTypeEnum = ProductType::tryFromString($item->product_type);
+                    if ($productTypeEnum) {
+                        $modelClass = $productTypeEnum->getModelClass();
                         $product = $modelClass::find($item->product_id);
                         if ($product && isset($product->stock)) {
                             $product->increment('stock', $item->quantity);
@@ -594,6 +635,20 @@ class OrderController extends Controller
 
                             // Track sale for tier progression
                             $seller->addSale($item->total);
+
+                            // Get game_id from product
+                            $gameId = null;
+                            if ($item->product_type && $item->product_id) {
+                                $productTypeEnum = ProductType::tryFromString($item->product_type);
+                                if ($productTypeEnum) {
+                                    $modelClass = $productTypeEnum->getModelClass();
+                                    $product = $modelClass::find($item->product_id);
+                                    $gameId = $product->game_id ?? null;
+                                }
+                            }
+
+                            // Update provider stats for this game
+                            $this->updateProviderStats($seller->id, $gameId, $item);
 
                             // Check for seller achievements after successful sale
                             $achievementService = app(AchievementCheckService::class);

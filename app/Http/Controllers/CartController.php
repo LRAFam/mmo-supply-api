@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use App\Models\Cart;
+use App\Enums\ProductType;
 
 class CartController extends Controller
 {
@@ -14,7 +15,12 @@ class CartController extends Controller
             'product_type' => 'required|string',
             'product_id' => 'required|integer',
             'quantity' => 'required|integer|min:1',
+            'metadata' => 'nullable|array',
         ]);
+
+        // Normalize product type to singular form
+        $productTypeEnum = ProductType::fromString($request->product_type);
+        $productType = $productTypeEnum->singularize();
 
         $user = $request->user();
 
@@ -29,9 +35,13 @@ class CartController extends Controller
         // Check if item already exists in cart
         $itemExists = false;
         foreach ($items as $key => $item) {
-            if ($item['product_type'] === $request->product_type &&
+            if ($item['product_type'] === $productType &&
                 $item['product_id'] === $request->product_id) {
                 $items[$key]['quantity'] += $request->quantity;
+                // Update metadata if provided
+                if ($request->has('metadata')) {
+                    $items[$key]['metadata'] = $request->metadata;
+                }
                 $itemExists = true;
                 break;
             }
@@ -39,11 +49,18 @@ class CartController extends Controller
 
         // Add new item if it doesn't exist
         if (!$itemExists) {
-            $items[] = [
-                'product_type' => $request->product_type,
+            $itemData = [
+                'product_type' => $productType,
                 'product_id' => $request->product_id,
                 'quantity' => $request->quantity,
             ];
+
+            // Add metadata if provided (for currencies: gold amount, character name, etc.)
+            if ($request->has('metadata')) {
+                $itemData['metadata'] = $request->metadata;
+            }
+
+            $items[] = $itemData;
         }
 
         $cart->items = $items;
@@ -67,33 +84,25 @@ class CartController extends Controller
 
         // Load actual product data for each cart item
         $items = collect($cart->items)->map(function ($item) {
-            $productType = $item['product_type'];
+            $productTypeStr = $item['product_type'];
             $productId = $item['product_id'];
 
-            // Get the model class based on product type (handle both singular and plural)
-            $modelClass = match($productType) {
-                'currency', 'currencies' => \App\Models\Currency::class,
-                'item', 'items' => \App\Models\Item::class,
-                'service', 'services' => \App\Models\Service::class,
-                'account', 'accounts' => \App\Models\Account::class,
-                default => null,
-            };
-
-            if (!$modelClass) {
+            // Use ProductType enum to get model class
+            $productTypeEnum = ProductType::tryFromString($productTypeStr);
+            if (!$productTypeEnum) {
                 return null;
             }
 
+            $modelClass = $productTypeEnum->getModelClass();
             $product = $modelClass::with('game')->find($productId);
 
             if (!$product) {
                 return null;
             }
 
-            // Get price based on product type (handle both singular and plural)
-            $price = match($productType) {
-                'currency', 'currencies' => floatval($product->price_per_unit ?? 0),
-                default => floatval($product->price ?? 0),
-            };
+            // Get price using ProductType enum
+            $priceField = $productTypeEnum->getPriceField();
+            $price = floatval($product->$priceField ?? 0);
 
             $discount = floatval($product->discount ?? 0);
             $discountPrice = $product->discount_price ? floatval($product->discount_price) : null;
@@ -101,9 +110,9 @@ class CartController extends Controller
             // Calculate final price: use discount_price if set, otherwise price - discount
             $finalPrice = $discountPrice ?? ($price - $discount);
 
-            return [
-                'id' => $productId . '-' . $productType,
-                'product_type' => $productType,
+            $cartItem = [
+                'id' => $productId . '-' . $productTypeEnum->singularize(),
+                'product_type' => $productTypeEnum->singularize(),
                 'product_id' => $productId,
                 'quantity' => $item['quantity'],
                 'item' => [
@@ -122,6 +131,13 @@ class CartController extends Controller
                 ],
                 'finalPrice' => $finalPrice,
             ];
+
+            // Include metadata if present (for currencies: gold amount, character name, etc.)
+            if (isset($item['metadata'])) {
+                $cartItem['metadata'] = $item['metadata'];
+            }
+
+            return $cartItem;
         })->filter()->values();
 
         return response()->json($items);
@@ -134,10 +150,27 @@ class CartController extends Controller
 
         $cart = Cart::where('user_id', $user->id)->first();
         if ($cart) {
-            $items = collect($cart->items)->filter(fn($item) => $item['id'] != $itemId)->values()->toArray();
-            $cart->items = $items;
-            $cart->save();
-            return response()->json($items);
+            // Parse the composite ID (format: "productId-productType")
+            $parts = explode('-', $itemId, 2);
+            if (count($parts) === 2) {
+                [$productId, $productTypeStr] = $parts;
+
+                // Normalize product type to singular form
+                $productTypeEnum = ProductType::tryFromString($productTypeStr);
+                if (!$productTypeEnum) {
+                    return response()->json(['error' => 'Invalid product type'], 400);
+                }
+                $productType = $productTypeEnum->singularize();
+
+                $items = collect($cart->items)->filter(function($item) use ($productId, $productType) {
+                    return !($item['product_id'] == $productId && $item['product_type'] == $productType);
+                })->values()->toArray();
+
+                $cart->items = $items;
+                $cart->save();
+            }
+
+            return response()->json($cart->items ?? []);
         }
 
         return response()->json([]);
@@ -149,7 +182,12 @@ class CartController extends Controller
             'product_type' => 'required|string',
             'product_id' => 'required|integer',
             'quantity' => 'required|integer|min:0',
+            'metadata' => 'nullable|array',
         ]);
+
+        // Normalize product type to singular form
+        $productTypeEnum = ProductType::fromString($request->product_type);
+        $productType = $productTypeEnum->singularize();
 
         $user = $request->user();
         $cart = Cart::where('user_id', $user->id)->first();
@@ -163,7 +201,7 @@ class CartController extends Controller
 
         // Find and update the item
         foreach ($items as $key => $item) {
-            if ($item['product_type'] === $request->product_type &&
+            if ($item['product_type'] === $productType &&
                 $item['product_id'] === $request->product_id) {
 
                 if ($request->quantity === 0) {
@@ -172,6 +210,11 @@ class CartController extends Controller
                 } else {
                     // Update quantity
                     $items[$key]['quantity'] = $request->quantity;
+
+                    // Update metadata if provided (for currencies: gold amount, character name, etc.)
+                    if ($request->has('metadata')) {
+                        $items[$key]['metadata'] = $request->metadata;
+                    }
                 }
 
                 $updated = true;
@@ -181,11 +224,18 @@ class CartController extends Controller
 
         if (!$updated && $request->quantity > 0) {
             // Item not found, add it
-            $items[] = [
-                'product_type' => $request->product_type,
+            $itemData = [
+                'product_type' => $productType,
                 'product_id' => $request->product_id,
                 'quantity' => $request->quantity,
             ];
+
+            // Add metadata if provided
+            if ($request->has('metadata')) {
+                $itemData['metadata'] = $request->metadata;
+            }
+
+            $items[] = $itemData;
         }
 
         $cart->items = array_values($items);

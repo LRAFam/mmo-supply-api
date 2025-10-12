@@ -24,22 +24,23 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         // Define polymorphic morph map for order items and subscriptions
+        // Using singular forms to match our ProductType enum
         Relation::enforceMorphMap([
             'user' => \App\Models\User::class,
-            'items' => \App\Models\Item::class,
-            'accounts' => \App\Models\Account::class,
-            'currencies' => \App\Models\Currency::class,
-            'services' => \App\Models\Service::class,
+            'item' => \App\Models\Item::class,
+            'account' => \App\Models\Account::class,
+            'currency' => \App\Models\Currency::class,
+            'service' => \App\Models\Service::class,
         ]);
 
         Event::listen(function (SocialiteWasCalled $event) {
             $event->extendSocialite('discord', Provider::class);
         });
 
-        // Register observers for Discord webhooks
-        \App\Models\Item::observe(\App\Observers\ItemObserver::class);
-        \App\Models\Currency::observe(\App\Observers\CurrencyObserver::class);
-        \App\Models\Account::observe(\App\Observers\AccountObserver::class);
-        \App\Models\Service::observe(\App\Observers\ServiceObserver::class);
+        // Register generic product observer for all product types
+        \App\Models\Item::observe(\App\Observers\ProductObserver::class);
+        \App\Models\Currency::observe(\App\Observers\ProductObserver::class);
+        \App\Models\Account::observe(\App\Observers\ProductObserver::class);
+        \App\Models\Service::observe(\App\Observers\ProductObserver::class);
     }
 }

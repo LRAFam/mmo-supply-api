@@ -253,9 +253,7 @@ class User extends Authenticatable implements FilamentUser
     public function sellerOrders()
     {
         return Order::whereHas('items', function ($query) {
-            $query->whereHas('product', function ($q) {
-                $q->where('user_id', $this->id);
-            });
+            $query->where('seller_id', $this->id);
         });
     }
 

@@ -291,20 +291,6 @@ Route::group(['prefix' => 'providers'], function () {
     Route::get('/{id}', [ProviderController::class, 'show'])->name('providers.show');
 });
 
-//Route::group(['prefix' => 'posts'], function () {
-//    Route::get('/', [PostController::class, 'index'])->name('posts.index');
-//    Route::get('/{post}', [PostController::class, 'show'])->name('posts.show');
-//});
-//
-//Route::group(['prefix' => 'updates'], function () {
-//    Route::get('/', [UpdateController::class, 'index'])->name('updates.index');
-//    Route::get('/{update}', [UpdateController::class, 'show'])->name('updates.show');
-//});
-//
-//Route::group(['prefix' => 'products'], function () {
-//    Route::get('/', [ProductController::class, 'index'])->name('products.index');
-//});
-
 Route::prefix('auth')->group(function () {
     Route::get('discord', [AuthController::class, 'redirectToProvider']);
     Route::get('discord/callback', [AuthController::class, 'handleProviderCallback']);
