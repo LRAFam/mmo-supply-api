@@ -35,6 +35,7 @@ use App\Http\Controllers\WalletController;
 use App\Http\Controllers\WishlistController;
 use App\Http\Controllers\CryptoPaymentController;
 use App\Http\Controllers\PayPalPayoutController;
+use App\Http\Controllers\PayPalCheckoutController;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Http\Request;
 
@@ -338,7 +339,14 @@ Route::middleware(['auth:sanctum'])->prefix('crypto')->name('crypto.')->group(fu
 Route::post('/crypto/webhook', [CryptoPaymentController::class, 'handleWebhook']);
 Route::post('/crypto/payout-webhook', [CryptoPaymentController::class, 'handleWebhook']);
 
-// PayPal payout routes
+// PayPal checkout routes (deposits)
+Route::middleware(['auth:sanctum', 'throttle:20,1'])->prefix('paypal')->name('paypal.')->group(function () {
+    Route::post('/create-order', [PayPalCheckoutController::class, 'createOrder']);
+    Route::post('/capture-order', [PayPalCheckoutController::class, 'captureOrder']);
+    Route::get('/order/{orderId}', [PayPalCheckoutController::class, 'getOrderDetails']);
+});
+
+// PayPal payout routes (withdrawals)
 Route::middleware(['auth:sanctum'])->prefix('payouts')->name('payouts.')->group(function () {
     Route::post('/paypal', [PayPalPayoutController::class, 'createPayout']);
     Route::get('/paypal/history', [PayPalPayoutController::class, 'getPayouts']);
