@@ -13,6 +13,7 @@ class Service extends Model
         'user_id',
         'game_id',
         'service_type',
+        'pricing_mode',  // New: 'fixed' or 'package_based'
         'title',
         'slug',
         'description',

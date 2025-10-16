@@ -58,6 +58,12 @@ class User extends Authenticatable implements FilamentUser
         'badge_inventory',
         'active_profile_theme',
         'active_title',
+        'discord_verification_code',
+        'discord_verification_code_expires_at',
+        'discord_guild_id',
+        'discord_channel_id',
+        'discord_registered_at',
+        'discord_notifications_enabled',
     ];
 
     /**
@@ -830,5 +836,83 @@ class User extends Authenticatable implements FilamentUser
             return $boostPerk->perk_data['boost_multiplier'] ?? 1.0;
         }
         return 1.0;
+    }
+
+    // ============================================================
+    // Discord Integration Methods
+    // ============================================================
+
+    /**
+     * Generate a Discord verification code
+     */
+    public function generateDiscordVerificationCode(): string
+    {
+        $code = strtoupper(substr(md5(uniqid($this->id . time(), true)), 0, 10));
+
+        $this->update([
+            'discord_verification_code' => $code,
+            'discord_verification_code_expires_at' => now()->addHours(24),
+        ]);
+
+        return $code;
+    }
+
+    /**
+     * Verify Discord code and register guild
+     */
+    public function verifyDiscordCode(string $code, string $guildId): bool
+    {
+        // Check if code matches and hasn't expired
+        if ($this->discord_verification_code !== $code) {
+            return false;
+        }
+
+        if ($this->discord_verification_code_expires_at && now()->gt($this->discord_verification_code_expires_at)) {
+            return false;
+        }
+
+        // Register the Discord guild
+        $this->update([
+            'discord_guild_id' => $guildId,
+            'discord_registered_at' => now(),
+            'discord_verification_code' => null, // Clear the code after use
+            'discord_verification_code_expires_at' => null,
+        ]);
+
+        return true;
+    }
+
+    /**
+     * Check if user has Discord notifications enabled
+     */
+    public function hasDiscordNotificationsEnabled(): bool
+    {
+        return $this->discord_notifications_enabled
+            && $this->discord_guild_id
+            && $this->hasActiveSubscription();
+    }
+
+    /**
+     * Update Discord channel ID
+     */
+    public function updateDiscordChannel(string $channelId): void
+    {
+        $this->update(['discord_channel_id' => $channelId]);
+    }
+
+    /**
+     * Disable Discord notifications
+     */
+    public function disableDiscordNotifications(): void
+    {
+        $this->update(['discord_notifications_enabled' => false]);
+    }
+
+    /**
+     * Enable Discord notifications
+     */
+    public function enableDiscordNotifications(): void
+    {
+        $this->update(['discord_notifications_enabled' => true]);
     }
 }

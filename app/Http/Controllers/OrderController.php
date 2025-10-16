@@ -117,7 +117,7 @@ class OrderController extends Controller
                 $itemTotal = $quantity * ($price - $discount);
                 $subtotal += $itemTotal;
 
-                $orderItems[] = [
+                $orderItem = [
                     'seller_id' => $product->user_id,
                     'product_type' => $normalizedProductType,
                     'product_id' => $product->id,
@@ -131,6 +131,13 @@ class OrderController extends Controller
                     'total' => $itemTotal,
                     'status' => 'pending',
                 ];
+
+                // Include metadata if present (e.g., selected service package)
+                if (isset($cartItem['metadata'])) {
+                    $orderItem['metadata'] = $cartItem['metadata'];
+                }
+
+                $orderItems[] = $orderItem;
 
                 // Decrease stock if applicable
                 if (isset($product->stock)) {

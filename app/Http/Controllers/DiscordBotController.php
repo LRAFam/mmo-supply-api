@@ -211,4 +211,107 @@ class DiscordBotController extends Controller
             'active_sellers' => User::where('is_seller', true)->where('is_active', true)->count(),
         ]);
     }
+
+    /**
+     * Verify Discord bot registration for a user
+     */
+    public function verifyDiscord(Request $request)
+    {
+        $request->validate([
+            'username' => 'required|string',
+            'verification_code' => 'required|string',
+            'guild_id' => 'required|string',
+        ]);
+
+        // Find user by username
+        $user = User::where('username', $request->username)
+            ->orWhere('name', $request->username)
+            ->first();
+
+        if (!$user) {
+            return response()->json([
+                'success' => false,
+                'error' => 'User not found',
+            ], 404);
+        }
+
+        // Check if user has active subscription
+        if (!$user->hasActiveSubscription()) {
+            return response()->json([
+                'success' => false,
+                'error' => 'No active subscription',
+            ], 401);
+        }
+
+        // Verify the code
+        if (!$user->verifyDiscordCode($request->verification_code, $request->guild_id)) {
+            return response()->json([
+                'success' => false,
+                'error' => 'Invalid or expired verification code',
+            ], 401);
+        }
+
+        return response()->json([
+            'success' => true,
+            'subscription_tier' => $user->getSubscriptionTier(),
+            'user_id' => $user->id,
+        ]);
+    }
+
+    /**
+     * Generate a Discord verification code for a user
+     */
+    public function generateVerificationCode(Request $request)
+    {
+        $user = $request->user();
+
+        if (!$user) {
+            return response()->json([
+                'success' => false,
+                'error' => 'Unauthorized',
+            ], 401);
+        }
+
+        // Check if user has active subscription
+        if (!$user->hasActiveSubscription()) {
+            return response()->json([
+                'success' => false,
+                'error' => 'Active subscription required',
+            ], 403);
+        }
+
+        $code = $user->generateDiscordVerificationCode();
+
+        return response()->json([
+            'success' => true,
+            'verification_code' => $code,
+            'expires_at' => $user->discord_verification_code_expires_at,
+        ]);
+    }
+
+    /**
+     * Get Discord registration status for authenticated user
+     */
+    public function getDiscordStatus(Request $request)
+    {
+        $user = $request->user();
+
+        if (!$user) {
+            return response()->json([
+                'success' => false,
+                'error' => 'Unauthorized',
+            ], 401);
+        }
+
+        return response()->json([
+            'success' => true,
+            'is_registered' => !empty($user->discord_guild_id),
+            'guild_id' => $user->discord_guild_id,
+            'channel_id' => $user->discord_channel_id,
+            'registered_at' => $user->discord_registered_at,
+            'notifications_enabled' => $user->discord_notifications_enabled,
+            'has_active_subscription' => $user->hasActiveSubscription(),
+            'subscription_tier' => $user->getSubscriptionTier(),
+        ]);
+    }
 }

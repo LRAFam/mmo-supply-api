@@ -66,6 +66,12 @@ return [
         'client_id' => env('PAYPAL_CLIENT_ID'),
         'client_secret' => env('PAYPAL_CLIENT_SECRET'),
         'webhook_id' => env('PAYPAL_WEBHOOK_ID'), // For webhook signature verification
+
+        // Payout restrictions
+        'daily_payout_limit' => env('PAYOUT_DAILY_LIMIT', 3),
+        'daily_amount_limit' => env('PAYOUT_DAILY_AMOUNT_LIMIT', 1000),
+        'auto_max_amount' => env('PAYOUT_AUTO_MAX_AMOUNT', 500),
+        'min_hours_between' => env('PAYOUT_MIN_HOURS_BETWEEN', 2),
     ],
 
 ];

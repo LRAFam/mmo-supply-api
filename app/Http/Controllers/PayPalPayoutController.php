@@ -96,6 +96,22 @@ class PayPalPayoutController extends Controller
             ], 400);
         }
 
+        // PAYOUT RESTRICTIONS: Check daily payout limits
+        $restrictionCheck = $this->checkPayoutRestrictions($user, $amount);
+        if (!$restrictionCheck['allowed']) {
+            return response()->json([
+                'success' => false,
+                'message' => $restrictionCheck['message'],
+                'restriction' => $restrictionCheck['restriction'],
+            ], 429); // Too Many Requests
+        }
+
+        // Check if payout requires manual review
+        $requiresReview = $this->requiresManualReview($amount);
+        if ($requiresReview) {
+            return $this->createManualPayoutRequest($user, $amount, $paypalEmail, $request->account_holder);
+        }
+
         try {
             DB::beginTransaction();
 
@@ -282,6 +298,236 @@ class PayPalPayoutController extends Controller
     }
 
     /**
+     * Get pending manual review payouts (admin only)
+     */
+    public function getPendingReviews()
+    {
+        // This should be protected by admin middleware in routes
+        $payouts = DB::table('paypal_payouts')
+            ->join('users', 'paypal_payouts.user_id', '=', 'users.id')
+            ->where('paypal_payouts.status', 'pending_review')
+            ->select('paypal_payouts.*', 'users.username', 'users.email as user_email')
+            ->orderBy('paypal_payouts.created_at', 'asc')
+            ->get();
+
+        return response()->json([
+            'success' => true,
+            'pending_payouts' => $payouts,
+        ]);
+    }
+
+    /**
+     * Approve manual payout request (admin only)
+     */
+    public function approveManualPayout($payoutId)
+    {
+        try {
+            DB::beginTransaction();
+
+            // Get the payout request
+            $payout = DB::table('paypal_payouts')->where('id', $payoutId)->first();
+
+            if (!$payout) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Payout not found',
+                ], 404);
+            }
+
+            if ($payout->status !== 'pending_review') {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Payout is not pending review',
+                ], 400);
+            }
+
+            $user = DB::table('users')->find($payout->user_id);
+            $wallet = DB::table('wallets')->where('user_id', $user->id)->first();
+
+            // Deduct from wallet and pending balance
+            DB::table('wallets')
+                ->where('id', $wallet->id)
+                ->decrement('balance', $payout->amount);
+
+            DB::table('wallets')
+                ->where('id', $wallet->id)
+                ->decrement('pending_balance', $payout->amount);
+
+            DB::table('users')
+                ->where('id', $user->id)
+                ->decrement('wallet_balance', $payout->amount);
+
+            // Process the payout via PayPal
+            $accessToken = $this->getAccessToken();
+            $senderBatchId = 'payout_approved_' . $payout->id . '_' . time() . '_' . uniqid();
+
+            $response = Http::withHeaders([
+                'Content-Type' => 'application/json',
+                'Authorization' => 'Bearer ' . $accessToken,
+            ])->post("{$this->apiUrl}/v1/payments/payouts", [
+                'sender_batch_header' => [
+                    'sender_batch_id' => $senderBatchId,
+                    'email_subject' => 'You have a payout from MMO.SUPPLY!',
+                    'email_message' => 'Your payout request has been approved and processed. Thank you for using our platform!',
+                ],
+                'items' => [[
+                    'recipient_type' => 'EMAIL',
+                    'amount' => [
+                        'value' => number_format($payout->net_amount, 2, '.', ''),
+                        'currency' => 'USD',
+                    ],
+                    'receiver' => $payout->paypal_email,
+                    'note' => 'Approved payout from MMO.SUPPLY',
+                    'sender_item_id' => 'approved_' . $payout->id,
+                ]],
+            ]);
+
+            if (!$response->successful()) {
+                // Refund if payout failed
+                DB::table('wallets')
+                    ->where('id', $wallet->id)
+                    ->increment('balance', $payout->amount);
+
+                DB::table('wallets')
+                    ->where('id', $wallet->id)
+                    ->increment('pending_balance', $payout->amount);
+
+                DB::table('users')
+                    ->where('id', $user->id)
+                    ->increment('wallet_balance', $payout->amount);
+
+                throw new \Exception('Failed to process PayPal payout');
+            }
+
+            $payoutData = $response->json();
+            $payoutBatchId = $payoutData['batch_header']['payout_batch_id'];
+
+            // Update payout record
+            DB::table('paypal_payouts')
+                ->where('id', $payoutId)
+                ->update([
+                    'status' => 'pending',
+                    'payout_batch_id' => $payoutBatchId,
+                    'sender_batch_id' => $senderBatchId,
+                    'updated_at' => now(),
+                ]);
+
+            // Create transaction record
+            DB::table('transactions')->insert([
+                'user_id' => $user->id,
+                'wallet_id' => $wallet->id,
+                'type' => 'withdrawal',
+                'amount' => -$payout->amount,
+                'currency' => 'USD',
+                'status' => 'completed',
+                'description' => "PayPal payout to {$payout->paypal_email} (approved)",
+                'payment_method' => 'paypal',
+                'metadata' => json_encode([
+                    'payout_batch_id' => $payoutBatchId,
+                    'sender_batch_id' => $senderBatchId,
+                    'paypal_email' => $payout->paypal_email,
+                    'gross_amount' => $payout->amount,
+                    'fee' => $payout->fee,
+                    'net_amount' => $payout->net_amount,
+                    'manually_approved' => true,
+                ]),
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+
+            DB::commit();
+
+            Log::info('Manual payout approved and processed', [
+                'payout_id' => $payoutId,
+                'user_id' => $user->id,
+                'amount' => $payout->amount,
+                'payout_batch_id' => $payoutBatchId,
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Payout approved and processed successfully',
+            ]);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('Manual payout approval error: ' . $e->getMessage());
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to approve payout: ' . $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Reject manual payout request (admin only)
+     */
+    public function rejectManualPayout(Request $request, $payoutId)
+    {
+        $request->validate([
+            'reason' => 'required|string|max:500',
+        ]);
+
+        try {
+            DB::beginTransaction();
+
+            $payout = DB::table('paypal_payouts')->where('id', $payoutId)->first();
+
+            if (!$payout) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Payout not found',
+                ], 404);
+            }
+
+            if ($payout->status !== 'pending_review') {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Payout is not pending review',
+                ], 400);
+            }
+
+            // Release the held funds
+            $wallet = DB::table('wallets')->where('user_id', $payout->user_id)->first();
+            if ($wallet) {
+                DB::table('wallets')
+                    ->where('id', $wallet->id)
+                    ->decrement('pending_balance', $payout->amount);
+            }
+
+            // Update payout status
+            DB::table('paypal_payouts')
+                ->where('id', $payoutId)
+                ->update([
+                    'status' => 'failed',
+                    'error_message' => 'Rejected by admin: ' . $request->reason,
+                    'updated_at' => now(),
+                ]);
+
+            DB::commit();
+
+            Log::info('Manual payout rejected', [
+                'payout_id' => $payoutId,
+                'user_id' => $payout->user_id,
+                'reason' => $request->reason,
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Payout rejected successfully',
+            ]);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('Manual payout rejection error: ' . $e->getMessage());
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to reject payout: ' . $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
      * Webhook handler for PayPal payout status updates
      */
     public function handleWebhook(Request $request)
@@ -389,6 +635,161 @@ class PayPalPayoutController extends Controller
                 'amount' => $payout->amount,
                 'error' => $errorMessage,
             ]);
+        }
+    }
+
+    /**
+     * Check if payout meets restriction requirements
+     */
+    private function checkPayoutRestrictions($user, $amount)
+    {
+        $now = now();
+        $today = $now->startOfDay();
+
+        // Get config values (with defaults)
+        $dailyLimit = config('services.paypal.daily_payout_limit', 3);
+        $dailyAmountLimit = config('services.paypal.daily_amount_limit', 1000);
+        $minHoursBetween = config('services.paypal.min_hours_between', 2);
+
+        // Check 1: Daily payout count limit
+        $todaysPayouts = DB::table('paypal_payouts')
+            ->where('user_id', $user->id)
+            ->where('created_at', '>=', $today)
+            ->whereIn('status', ['pending', 'success'])
+            ->count();
+
+        if ($todaysPayouts >= $dailyLimit) {
+            return [
+                'allowed' => false,
+                'message' => "Daily payout limit reached. You can request up to {$dailyLimit} payouts per day. Try again tomorrow.",
+                'restriction' => 'daily_count_limit',
+            ];
+        }
+
+        // Check 2: Daily amount limit
+        $todaysTotal = DB::table('paypal_payouts')
+            ->where('user_id', $user->id)
+            ->where('created_at', '>=', $today)
+            ->whereIn('status', ['pending', 'success'])
+            ->sum('amount');
+
+        if (($todaysTotal + $amount) > $dailyAmountLimit) {
+            $remaining = $dailyAmountLimit - $todaysTotal;
+            return [
+                'allowed' => false,
+                'message' => "Daily payout amount limit reached. You can withdraw up to \${$dailyAmountLimit} per day. Remaining today: \${$remaining}",
+                'restriction' => 'daily_amount_limit',
+            ];
+        }
+
+        // Check 3: Minimum time between payouts
+        $lastPayout = DB::table('paypal_payouts')
+            ->where('user_id', $user->id)
+            ->whereIn('status', ['pending', 'success'])
+            ->orderBy('created_at', 'desc')
+            ->first();
+
+        if ($lastPayout) {
+            $lastPayoutTime = \Carbon\Carbon::parse($lastPayout->created_at);
+            $hoursSinceLastPayout = $now->diffInHours($lastPayoutTime);
+
+            if ($hoursSinceLastPayout < $minHoursBetween) {
+                $hoursRemaining = $minHoursBetween - $hoursSinceLastPayout;
+                $minutesRemaining = ceil($hoursRemaining * 60);
+                return [
+                    'allowed' => false,
+                    'message' => "Please wait {$minutesRemaining} minutes before requesting another payout. Minimum time between payouts is {$minHoursBetween} hours.",
+                    'restriction' => 'time_between_payouts',
+                ];
+            }
+        }
+
+        return [
+            'allowed' => true,
+        ];
+    }
+
+    /**
+     * Check if payout requires manual review
+     */
+    private function requiresManualReview($amount)
+    {
+        $maxAutoAmount = config('services.paypal.auto_max_amount', 500);
+        return $amount > $maxAutoAmount;
+    }
+
+    /**
+     * Create a manual payout request (requires admin approval)
+     */
+    private function createManualPayoutRequest($user, $amount, $paypalEmail, $accountHolder)
+    {
+        try {
+            DB::beginTransaction();
+
+            // Calculate fee
+            $feePercent = 0.02;
+            $fee = max($amount * $feePercent, 0.25);
+            $netAmount = $amount - $fee;
+
+            // Hold the funds in wallet (don't deduct yet)
+            $wallet = $user->wallet;
+
+            // Create pending payout request
+            $payoutId = DB::table('paypal_payouts')->insertGetId([
+                'user_id' => $user->id,
+                'transaction_id' => null, // Will be set when approved
+                'payout_batch_id' => null,
+                'sender_batch_id' => null,
+                'paypal_email' => $paypalEmail,
+                'amount' => $amount,
+                'fee' => $fee,
+                'net_amount' => $netAmount,
+                'status' => 'pending_review',
+                'metadata' => json_encode([
+                    'account_holder' => $accountHolder,
+                    'requires_manual_review' => true,
+                    'reason' => 'Amount exceeds automatic payout limit',
+                ]),
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+
+            // Update wallet pending balance
+            $wallet->pending_balance += $amount;
+            $wallet->save();
+
+            DB::commit();
+
+            Log::info('Manual payout request created', [
+                'user_id' => $user->id,
+                'payout_id' => $payoutId,
+                'amount' => $amount,
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'requires_review' => true,
+                'message' => 'Your payout request has been submitted for manual review. Large payouts require admin approval for security. You will be notified once approved.',
+                'payout' => [
+                    'id' => $payoutId,
+                    'amount' => $amount,
+                    'fee' => $fee,
+                    'net_amount' => $netAmount,
+                    'paypal_email' => $paypalEmail,
+                    'status' => 'pending_review',
+                ],
+            ]);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('Manual payout request error: ' . $e->getMessage(), [
+                'user_id' => $user->id,
+                'amount' => $amount,
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to create payout request: ' . $e->getMessage(),
+            ], 500);
         }
     }
 }

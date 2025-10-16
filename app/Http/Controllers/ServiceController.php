@@ -28,6 +28,7 @@ class ServiceController extends BaseProductController
 
         return array_merge($this->getCommonValidationRules($isUpdate), [
             // Service-specific fields
+            'pricing_mode' => 'nullable|string|in:fixed,package_based',
             'estimated_time' => 'nullable|string',
             'packages' => 'nullable|array',
             'addons' => 'nullable|array',

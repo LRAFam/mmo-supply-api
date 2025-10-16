@@ -60,6 +60,18 @@ Route::prefix('discord-bot')->middleware('discord.bot')->group(function () {
     Route::get('/stats', [DiscordBotController::class, 'getStats']);
 });
 
+// Discord Integration Routes
+Route::prefix('discord')->group(function () {
+    // Public verification endpoint (for bot to verify users)
+    Route::post('/verify', [DiscordBotController::class, 'verifyDiscord']);
+
+    // Protected endpoints (require user auth)
+    Route::middleware('auth:sanctum')->group(function () {
+        Route::post('/generate-code', [DiscordBotController::class, 'generateVerificationCode']);
+        Route::get('/status', [DiscordBotController::class, 'getDiscordStatus']);
+    });
+});
+
 Route::get('/sanctum/csrf-cookie', function () {
     return response()->json(['message' => 'CSRF token set', 'token' => csrf_token()]);
 });
@@ -351,6 +363,13 @@ Route::middleware(['auth:sanctum'])->prefix('payouts')->name('payouts.')->group(
     Route::post('/paypal', [PayPalPayoutController::class, 'createPayout']);
     Route::get('/paypal/history', [PayPalPayoutController::class, 'getPayouts']);
     Route::get('/paypal/{payoutBatchId}/status', [PayPalPayoutController::class, 'getPayoutStatus']);
+});
+
+// Admin payout management routes
+Route::middleware(['auth:sanctum', 'admin'])->prefix('admin/payouts')->name('admin.payouts.')->group(function () {
+    Route::get('/pending-reviews', [PayPalPayoutController::class, 'getPendingReviews']);
+    Route::post('/{payoutId}/approve', [PayPalPayoutController::class, 'approveManualPayout']);
+    Route::post('/{payoutId}/reject', [PayPalPayoutController::class, 'rejectManualPayout']);
 });
 
 // PayPal webhooks (no auth required)

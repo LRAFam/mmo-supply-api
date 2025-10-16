@@ -147,22 +147,54 @@ class PayPalCheckoutController extends Controller
 
             $accessToken = $this->getAccessToken();
 
-            // Capture the order
-            $response = Http::withHeaders([
+            // First, verify the order exists and belongs to this user
+            $orderCheckResponse = Http::withHeaders([
                 'Content-Type' => 'application/json',
                 'Authorization' => 'Bearer ' . $accessToken,
-            ])->post("{$this->apiUrl}/v2/checkout/orders/{$orderId}/capture");
+            ])->get("{$this->apiUrl}/v2/checkout/orders/{$orderId}");
 
-            if (!$response->successful()) {
-                $errorMessage = $response->json()['message'] ?? 'Failed to capture PayPal order';
+            if (!$orderCheckResponse->successful()) {
+                Log::error('PayPal order verification failed', [
+                    'user_id' => $user->id,
+                    'order_id' => $orderId,
+                    'response' => $orderCheckResponse->json(),
+                ]);
+                throw new \Exception('Order not found or invalid');
+            }
+
+            $orderData = $orderCheckResponse->json();
+
+            // Check if order is already captured
+            if (isset($orderData['status']) && $orderData['status'] === 'COMPLETED') {
+                throw new \Exception('This order has already been captured');
+            }
+
+            // Verify order is in APPROVED state
+            if (!isset($orderData['status']) || $orderData['status'] !== 'APPROVED') {
+                throw new \Exception('Order must be approved before capture. Current status: ' . ($orderData['status'] ?? 'unknown'));
+            }
+
+            // Capture the order - send empty object {} not empty array []
+            $captureResponse = Http::withToken($accessToken)
+                ->post("{$this->apiUrl}/v2/checkout/orders/{$orderId}/capture", (object)[]);
+
+            if (!$captureResponse->successful()) {
+                $errorData = $captureResponse->json();
+                Log::error('PayPal capture API error', [
+                    'user_id' => $user->id,
+                    'order_id' => $orderId,
+                    'status' => $captureResponse->status(),
+                    'response' => $errorData,
+                ]);
+                $errorMessage = $errorData['message'] ?? $errorData['error_description'] ?? 'Failed to capture PayPal order';
                 throw new \Exception($errorMessage);
             }
 
-            $captureData = $response->json();
-            $status = $captureData['status'];
+            $captureData = $captureResponse->json();
+            $status = $captureData['status'] ?? null;
 
             if ($status !== 'COMPLETED') {
-                throw new \Exception('PayPal order capture failed: ' . $status);
+                throw new \Exception('PayPal order capture failed with status: ' . ($status ?? 'unknown'));
             }
 
             // Get the captured amount
@@ -212,7 +244,7 @@ class PayPalCheckoutController extends Controller
                 'order_id' => $orderId,
             ]);
 
-            // Update transaction to failed
+            // Update transaction to failed (if it exists)
             DB::table('transactions')
                 ->where('user_id', $user->id)
                 ->where('payment_method', 'paypal')

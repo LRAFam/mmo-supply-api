@@ -26,6 +26,7 @@ class OrderItem extends Model
         'discount',
         'total',
         'status',
+        'metadata',  // New: Store package selection and other metadata
         'delivery_details',
         'delivered_at',
         'buyer_confirmed',
@@ -46,6 +47,7 @@ class OrderItem extends Model
         'auto_release_at' => 'datetime',
         'funds_released_at' => 'datetime',
         'product_images' => 'array',
+        'metadata' => 'array',  // Cast metadata as JSON array
         'buyer_confirmed' => 'boolean',
         'auto_released' => 'boolean',
         'funds_released' => 'boolean',
