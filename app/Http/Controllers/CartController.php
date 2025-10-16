@@ -107,8 +107,24 @@ class CartController extends Controller
             $discount = floatval($product->discount ?? 0);
             $discountPrice = $product->discount_price ? floatval($product->discount_price) : null;
 
-            // Calculate final price: use discount_price if set, otherwise price - discount
-            $finalPrice = $discountPrice ?? ($price - $discount);
+            // For package-based services, use the package price from metadata
+            if ($productTypeEnum->singularize() === 'service' &&
+                isset($item['metadata']['package_price'])) {
+                $finalPrice = floatval($item['metadata']['package_price']);
+            } else {
+                // Calculate final price: use discount_price if set, otherwise price - discount
+                $finalPrice = $discountPrice ?? ($price - $discount);
+            }
+
+            // For package-based services, append package name to title
+            $itemName = $product->name ?? $product->title ?? 'Unknown';
+            $itemTitle = $product->title ?? $product->name ?? 'Unknown';
+            if ($productTypeEnum->singularize() === 'service' &&
+                isset($item['metadata']['package_name'])) {
+                $packageName = $item['metadata']['package_name'];
+                $itemName .= ' - ' . $packageName;
+                $itemTitle .= ' - ' . $packageName;
+            }
 
             $cartItem = [
                 'id' => $productId . '-' . $productTypeEnum->singularize(),
@@ -117,8 +133,8 @@ class CartController extends Controller
                 'quantity' => $item['quantity'],
                 'item' => [
                     'id' => $product->id,
-                    'name' => $product->name ?? $product->title ?? 'Unknown',
-                    'title' => $product->title ?? $product->name ?? 'Unknown',
+                    'name' => $itemName,
+                    'title' => $itemTitle,
                     'description' => $product->description ?? '',
                     'price' => $price,
                     'discount' => $discount,
