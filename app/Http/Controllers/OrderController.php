@@ -66,14 +66,23 @@ class OrderController extends Controller
     public function store(Request $request): JsonResponse
     {
         $request->validate([
-            'payment_method' => 'required|string',
-            'buyer_notes' => 'nullable|string',
+            'payment_method' => 'required|string|in:wallet,stripe,paypal',
+            'buyer_notes' => 'nullable|string|max:1000',
         ]);
 
         try {
             DB::beginTransaction();
 
             $user = $request->user();
+
+            // SECURITY: Require email verification before purchases
+            if (!$user->email_verified_at) {
+                return response()->json([
+                    'error' => 'Email verification required',
+                    'message' => 'Please verify your email address before making purchases',
+                    'requires_verification' => true
+                ], 403);
+            }
 
             // Get cart
             $cart = Cart::where('user_id', $user->id)->first();
