@@ -32,8 +32,8 @@ class WalletController extends Controller
             'available_balance' => $wallet->available_balance,
             'wallet_balance' => floatval($wallet->balance),
             'pending_balance' => floatval($wallet->pending_balance),
-            'bonus_balance' => floatval($user->bonus_balance ?? 0),
-            'total_balance' => floatval($wallet->balance) + floatval($user->bonus_balance ?? 0),
+            'bonus_balance' => floatval($wallet->bonus_balance ?? 0),
+            'total_balance' => $wallet->total_balance,
         ]);
     }
 

@@ -14,6 +14,7 @@ class Wallet extends Model
     protected $fillable = [
         'user_id',
         'balance',
+        'bonus_balance',
         'pending_balance',
         'currency',
         'is_active',
@@ -21,6 +22,7 @@ class Wallet extends Model
 
     protected $casts = [
         'balance' => 'decimal:2',
+        'bonus_balance' => 'decimal:2',
         'pending_balance' => 'decimal:2',
         'is_active' => 'boolean',
     ];
@@ -127,5 +129,10 @@ class Wallet extends Model
     public function getAvailableBalanceAttribute(): float
     {
         return $this->balance - $this->pending_balance;
+    }
+
+    public function getTotalBalanceAttribute(): float
+    {
+        return $this->balance + $this->bonus_balance;
     }
 }

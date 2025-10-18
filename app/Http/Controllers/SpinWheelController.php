@@ -183,11 +183,12 @@ class SpinWheelController extends Controller
             // Award prize if wallet_credit
             // SECURITY: Credit to bonus_balance (non-withdrawable) instead of wallet_balance
             if ($selectedPrize->type === 'wallet_credit' && $selectedPrize->value > 0) {
-                $user->increment('bonus_balance', $selectedPrize->value);
-
-                // Create transaction record in Wallet for tracking
                 $wallet = $user->wallet;
                 if ($wallet) {
+                    // Increment bonus_balance in wallet (single source of truth)
+                    $wallet->increment('bonus_balance', $selectedPrize->value);
+
+                    // Create transaction record in Wallet for tracking
                     $wallet->transactions()->create([
                         'user_id' => $user->id,
                         'type' => 'deposit',
@@ -227,6 +228,7 @@ class SpinWheelController extends Controller
             DB::commit();
 
             $user->refresh();
+            $wallet = $user->wallet;
 
             $response = [
                 'message' => 'Spin successful!',
@@ -238,9 +240,9 @@ class SpinWheelController extends Controller
                     'color' => $selectedPrize->color,
                     'icon' => $selectedPrize->icon,
                 ],
-                'wallet_balance' => $user->wallet_balance,
-                'bonus_balance' => $user->bonus_balance,
-                'total_balance' => $user->wallet_balance + $user->bonus_balance,
+                'wallet_balance' => $wallet->balance,
+                'bonus_balance' => $wallet->bonus_balance,
+                'total_balance' => $wallet->total_balance,
                 'next_spin_at' => $wheel->cost == 0 ? now()->addHours($wheel->cooldown_hours) : null,
             ];
 
