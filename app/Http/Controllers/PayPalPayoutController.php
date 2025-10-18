@@ -541,8 +541,15 @@ class PayPalPayoutController extends Controller
     public function handleWebhook(Request $request)
     {
         try {
-            // Verify webhook signature (recommended in production)
+            // SECURITY: Verify webhook signature to prevent fraud
             // https://developer.paypal.com/api/rest/webhooks/
+            if (!$this->verifyWebhookSignature($request)) {
+                Log::warning('PayPal webhook signature verification failed', [
+                    'headers' => $request->headers->all(),
+                    'ip' => $request->ip(),
+                ]);
+                return response()->json(['error' => 'Invalid signature'], 401);
+            }
 
             $eventType = $request->input('event_type');
             $resource = $request->input('resource');
@@ -801,6 +808,77 @@ class PayPalPayoutController extends Controller
                 'success' => false,
                 'message' => 'Failed to create payout request: ' . $e->getMessage(),
             ], 500);
+        }
+    }
+
+    /**
+     * Verify PayPal webhook signature for security
+     *
+     * @param Request $request
+     * @return bool
+     */
+    private function verifyWebhookSignature(Request $request): bool
+    {
+        // Get webhook ID from environment (must be configured in PayPal dashboard)
+        $webhookId = config('services.paypal.webhook_id');
+
+        if (!$webhookId) {
+            Log::warning('PayPal webhook ID not configured - skipping signature verification');
+            // In development, allow unverified webhooks if no webhook ID is set
+            // In production, this should return false
+            return $this->mode !== 'live';
+        }
+
+        try {
+            $accessToken = $this->getAccessToken();
+
+            // Get webhook headers
+            $transmissionId = $request->header('PAYPAL-TRANSMISSION-ID');
+            $transmissionTime = $request->header('PAYPAL-TRANSMISSION-TIME');
+            $transmissionSig = $request->header('PAYPAL-TRANSMISSION-SIG');
+            $certUrl = $request->header('PAYPAL-CERT-URL');
+            $authAlgo = $request->header('PAYPAL-AUTH-ALGO');
+
+            if (!$transmissionId || !$transmissionTime || !$transmissionSig) {
+                Log::warning('Missing PayPal webhook headers');
+                return false;
+            }
+
+            // Call PayPal's webhook verification API
+            $response = Http::withHeaders([
+                'Content-Type' => 'application/json',
+                'Authorization' => 'Bearer ' . $accessToken,
+            ])->post("{$this->apiUrl}/v1/notifications/verify-webhook-signature", [
+                'auth_algo' => $authAlgo,
+                'cert_url' => $certUrl,
+                'transmission_id' => $transmissionId,
+                'transmission_sig' => $transmissionSig,
+                'transmission_time' => $transmissionTime,
+                'webhook_id' => $webhookId,
+                'webhook_event' => $request->all(),
+            ]);
+
+            if (!$response->successful()) {
+                Log::error('PayPal webhook verification API failed', [
+                    'status' => $response->status(),
+                    'response' => $response->json(),
+                ]);
+                return false;
+            }
+
+            $result = $response->json();
+            $verified = $result['verification_status'] === 'SUCCESS';
+
+            if (!$verified) {
+                Log::warning('PayPal webhook signature invalid', [
+                    'verification_status' => $result['verification_status'] ?? 'unknown',
+                ]);
+            }
+
+            return $verified;
+        } catch (\Exception $e) {
+            Log::error('PayPal webhook verification error: ' . $e->getMessage());
+            return false;
         }
     }
 }
