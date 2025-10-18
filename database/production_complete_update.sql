@@ -3,9 +3,10 @@
 -- Run this on production: mysql -u forge -p forge < production_complete_update.sql
 
 -- ==================================================
--- PART 1: Add RSPS Game
+-- PART 1: Add New Game Categories
 -- ==================================================
 
+-- Add RSPS (Private Servers)
 INSERT INTO games (id, title, slug, description, logo, icon, provider_count, created_at, updated_at)
 VALUES (
     22,
@@ -21,6 +22,24 @@ VALUES (
 ON DUPLICATE KEY UPDATE
     title = 'RSPS (Private Servers)',
     description = 'RuneScape Private Servers - Find accounts, items, services, and currency for your favorite RSPS',
+    updated_at = NOW();
+
+-- Add Gaming Creative Services
+INSERT INTO games (id, title, slug, description, logo, icon, provider_count, created_at, updated_at)
+VALUES (
+    23,
+    'Gaming Creative Services',
+    'gaming-creative-services',
+    'Professional creative services for gamers and content creators - GFX design, video editing, streaming assets, Discord services, and more',
+    NULL,
+    NULL,
+    0,
+    NOW(),
+    NOW()
+)
+ON DUPLICATE KEY UPDATE
+    title = 'Gaming Creative Services',
+    description = 'Professional creative services for gamers and content creators - GFX design, video editing, streaming assets, Discord services, and more',
     updated_at = NOW();
 
 -- ==================================================
@@ -165,8 +184,8 @@ WHERE id = 41;
 -- VERIFICATION QUERIES
 -- ==================================================
 
-SELECT '=== RSPS GAME ===' as section;
-SELECT id, title, slug, provider_count FROM games WHERE id = 22;
+SELECT '=== NEW GAME CATEGORIES ===' as section;
+SELECT id, title, slug, provider_count FROM games WHERE id IN (22, 23) ORDER BY id;
 
 SELECT '=== NEW MONTHLY REFERRAL RALLY EVENT ===' as section;
 SELECT id, name, type, status, is_featured FROM events WHERE id = 10;
