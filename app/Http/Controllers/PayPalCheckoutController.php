@@ -201,13 +201,14 @@ class PayPalCheckoutController extends Controller
             $capturedAmount = floatval($captureData['purchase_units'][0]['payments']['captures'][0]['amount']['value']);
             $captureId = $captureData['purchase_units'][0]['payments']['captures'][0]['id'];
 
-            // Credit user's wallet
+            // Credit user's wallet (single source of truth)
             $wallet = $user->wallet;
             $wallet->balance += $capturedAmount;
             $wallet->save();
 
-            // Update user's wallet_balance
-            $user->increment('wallet_balance', $capturedAmount);
+            // Sync user's wallet_balance cache to match authoritative wallet balance
+            $user->wallet_balance = $wallet->balance;
+            $user->save();
 
             // Update transaction to completed
             DB::table('transactions')

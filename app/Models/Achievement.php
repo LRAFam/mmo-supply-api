@@ -132,12 +132,14 @@ class Achievement extends Model
             $cashReward = $seasonPass->calculateReward($this->wallet_reward);
 
             if ($cashReward > 0) {
-                $user->increment('wallet_balance', $cashReward);
-
-                // Also update the Wallet model balance
+                // Update wallet balance (single source of truth)
                 $wallet = $user->wallet;
                 if ($wallet) {
                     $wallet->increment('balance', $cashReward);
+
+                    // Sync user's wallet_balance cache to match authoritative wallet balance
+                    $user->wallet_balance = $wallet->balance;
+                    $user->save();
 
                     // Create transaction record
                     $wallet->transactions()->create([

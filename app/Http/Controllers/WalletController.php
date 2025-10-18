@@ -241,11 +241,13 @@ class WalletController extends Controller
                 'status' => 'pending',
             ]);
 
-            // Deduct from user's wallet_balance immediately
-            $user->decrement('wallet_balance', $request->amount);
-
-            // Hold the balance in wallet
+            // Move funds from available balance to pending (single source of truth)
+            $wallet->decrement('balance', $request->amount);
             $wallet->increment('pending_balance', $request->amount);
+
+            // Sync user's wallet_balance cache to match authoritative wallet balance
+            $user->wallet_balance = $wallet->balance;
+            $user->save();
 
             DB::commit();
 

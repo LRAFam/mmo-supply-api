@@ -126,12 +126,13 @@ class PayPalPayoutController extends Controller
                 $netAmount = $amount - $fee;
             }
 
-            // Deduct from wallet
+            // Deduct from wallet (single source of truth)
             $wallet->balance -= $amount;
             $wallet->save();
 
-            // Deduct from user's wallet_balance
-            $user->decrement('wallet_balance', $amount);
+            // Sync user's wallet_balance cache to match authoritative wallet balance
+            $user->wallet_balance = $wallet->balance;
+            $user->save();
 
             // Get PayPal access token
             $accessToken = $this->getAccessToken();
@@ -162,10 +163,13 @@ class PayPalPayoutController extends Controller
             ]);
 
             if (!$response->successful()) {
-                // Refund wallet if payout failed
+                // Refund wallet if payout failed (single source of truth)
                 $wallet->balance += $amount;
                 $wallet->save();
-                $user->increment('wallet_balance', $amount);
+
+                // Sync user's wallet_balance cache to match authoritative wallet balance
+                $user->wallet_balance = $wallet->balance;
+                $user->save();
 
                 $errorMessage = $response->json()['message'] ?? 'Failed to create PayPal payout';
                 throw new \Exception($errorMessage);
@@ -344,7 +348,7 @@ class PayPalPayoutController extends Controller
             $user = DB::table('users')->find($payout->user_id);
             $wallet = DB::table('wallets')->where('user_id', $user->id)->first();
 
-            // Deduct from wallet and pending balance
+            // Deduct from wallet and pending balance (single source of truth)
             DB::table('wallets')
                 ->where('id', $wallet->id)
                 ->decrement('balance', $payout->amount);
@@ -353,9 +357,11 @@ class PayPalPayoutController extends Controller
                 ->where('id', $wallet->id)
                 ->decrement('pending_balance', $payout->amount);
 
+            // Sync user's wallet_balance cache to match wallet balance
+            $updatedWallet = DB::table('wallets')->where('id', $wallet->id)->first();
             DB::table('users')
                 ->where('id', $user->id)
-                ->decrement('wallet_balance', $payout->amount);
+                ->update(['wallet_balance' => $updatedWallet->balance]);
 
             // Process the payout via PayPal
             $accessToken = $this->getAccessToken();
@@ -383,7 +389,7 @@ class PayPalPayoutController extends Controller
             ]);
 
             if (!$response->successful()) {
-                // Refund if payout failed
+                // Refund if payout failed (single source of truth)
                 DB::table('wallets')
                     ->where('id', $wallet->id)
                     ->increment('balance', $payout->amount);
@@ -392,9 +398,11 @@ class PayPalPayoutController extends Controller
                     ->where('id', $wallet->id)
                     ->increment('pending_balance', $payout->amount);
 
+                // Sync user's wallet_balance cache to match wallet balance
+                $refundedWallet = DB::table('wallets')->where('id', $wallet->id)->first();
                 DB::table('users')
                     ->where('id', $user->id)
-                    ->increment('wallet_balance', $payout->amount);
+                    ->update(['wallet_balance' => $refundedWallet->balance]);
 
                 throw new \Exception('Failed to process PayPal payout');
             }
@@ -604,18 +612,21 @@ class PayPalPayoutController extends Controller
             ->first();
 
         if ($payout) {
-            // Refund the user's wallet
+            // Refund the user's wallet (single source of truth)
             $user = DB::table('users')->find($payout->user_id);
             if ($user) {
-                DB::table('users')
-                    ->where('id', $user->id)
-                    ->increment('wallet_balance', $payout->amount);
-
                 $wallet = DB::table('wallets')->where('user_id', $user->id)->first();
                 if ($wallet) {
+                    // Update wallet balance first (source of truth)
                     DB::table('wallets')
                         ->where('id', $wallet->id)
                         ->increment('balance', $payout->amount);
+
+                    // Sync user's wallet_balance cache to match wallet balance
+                    $updatedWallet = DB::table('wallets')->where('id', $wallet->id)->first();
+                    DB::table('users')
+                        ->where('id', $user->id)
+                        ->update(['wallet_balance' => $updatedWallet->balance]);
                 }
             }
 

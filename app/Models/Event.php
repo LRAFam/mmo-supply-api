@@ -221,9 +221,17 @@ class Event extends Model
 
             DB::beginTransaction();
             try {
-                // Award wallet balance
+                // Award wallet balance (single source of truth)
                 if (isset($prizeData['wallet_amount']) && $prizeData['wallet_amount'] > 0) {
-                    $winner->user->increment('wallet_balance', $prizeData['wallet_amount']);
+                    $user = $winner->user;
+                    $wallet = $user->wallet;
+                    if ($wallet) {
+                        $wallet->increment('balance', $prizeData['wallet_amount']);
+
+                        // Sync user's wallet_balance cache to match authoritative wallet balance
+                        $user->wallet_balance = $wallet->balance;
+                        $user->save();
+                    }
                 }
 
                 // Mark prize as claimed
