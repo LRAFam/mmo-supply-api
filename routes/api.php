@@ -88,7 +88,8 @@ Route::middleware(['auth:sanctum'])->prefix('users')->name('users.')->group(func
     Route::delete('/provider-games/{providerId}', [UserController::class, 'removeProviderGame'])->name('removeProviderGame');
 });
 
-Route::middleware(["auth:sanctum"])->prefix("stripe")->name("stripe.")->group(function () {
+// Stripe routes with rate limiting to prevent abuse
+Route::middleware(["auth:sanctum", "throttle:30,1"])->prefix("stripe")->name("stripe.")->group(function () {
     // Stripe API routes
     Route::post("/create-payment-intent", [PaymentController::class, "createPaymentIntent"]);
     Route::get("/payment-intent/{paymentIntentId}", [StripePaymentController::class, "getPaymentIntent"]);
