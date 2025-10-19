@@ -49,10 +49,22 @@ class CartController extends Controller
 
         // Add new item if it doesn't exist
         if (!$itemExists) {
+            // Load the product to calculate price
+            $modelClass = $productTypeEnum->getModelClass();
+            $product = $modelClass::find($request->product_id);
+
+            if (!$product) {
+                return response()->json(['error' => 'Product not found'], 404);
+            }
+
+            // Calculate unit price based on product type and metadata
+            $unitPrice = $this->calculateUnitPrice($product, $productTypeEnum, $request->metadata);
+
             $itemData = [
                 'product_type' => $productType,
                 'product_id' => $request->product_id,
                 'quantity' => $request->quantity,
+                'unit_price' => $unitPrice, // Store calculated price
             ];
 
             // Add metadata if provided (for currencies: gold amount, character name, etc.)
@@ -100,28 +112,20 @@ class CartController extends Controller
                 return null;
             }
 
-            // Get price using ProductType enum
+            // Use stored unit_price if available (calculated when added to cart)
+            // Otherwise fall back to calculating it now
+            if (isset($item['unit_price'])) {
+                $finalPrice = floatval($item['unit_price']);
+            } else {
+                // Legacy: calculate price for old cart items without unit_price
+                $finalPrice = $this->calculateUnitPrice($product, $productTypeEnum, $item['metadata'] ?? null);
+            }
+
+            // Get base price for display purposes
             $priceField = $productTypeEnum->getPriceField();
             $price = floatval($product->$priceField ?? 0);
-
             $discount = floatval($product->discount ?? 0);
             $discountPrice = $product->discount_price ? floatval($product->discount_price) : null;
-
-            // For OSRS currency with price_per_million, calculate based on gold amount
-            if ($productTypeEnum->singularize() === 'currency' &&
-                isset($product->price_per_million) && $product->price_per_million > 0 &&
-                isset($item['metadata']['gold_amount'])) {
-                $goldInMillions = floatval($item['metadata']['gold_amount']) / 1000000;
-                $finalPrice = floatval($product->price_per_million) * $goldInMillions;
-            }
-            // For package-based services, use the package price from metadata
-            elseif ($productTypeEnum->singularize() === 'service' &&
-                isset($item['metadata']['package_price'])) {
-                $finalPrice = floatval($item['metadata']['package_price']);
-            } else {
-                // Calculate final price: use discount_price if set, otherwise price - discount
-                $finalPrice = $discountPrice ?? ($price - $discount);
-            }
 
             // For package-based services, append package name to title
             $itemName = $product->name ?? $product->title ?? 'Unknown';
@@ -284,5 +288,31 @@ class CartController extends Controller
             'message' => 'Cart updated',
             'cart' => $cart,
         ]);
+    }
+
+    /**
+     * Calculate the unit price for a product based on type and metadata
+     */
+    private function calculateUnitPrice($product, $productTypeEnum, $metadata = null): float
+    {
+        $productType = $productTypeEnum->singularize();
+
+        // For OSRS currency with price_per_million
+        if ($productType === 'currency' && isset($product->price_per_million) && $product->price_per_million > 0 && isset($metadata['gold_amount'])) {
+            $goldInMillions = floatval($metadata['gold_amount']) / 1000000;
+            return floatval($product->price_per_million) * $goldInMillions;
+        }
+
+        // For package-based services
+        if ($productType === 'service' && isset($metadata['package_price'])) {
+            return floatval($metadata['package_price']);
+        }
+
+        // Regular pricing
+        $priceField = $productTypeEnum->getPriceField();
+        $price = floatval($product->{$priceField} ?? 0);
+        $discount = floatval($product->discount ?? 0);
+
+        return $price - $discount;
     }
 }

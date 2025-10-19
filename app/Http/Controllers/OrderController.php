@@ -118,12 +118,29 @@ class OrderController extends Controller
                     continue;
                 }
 
-                // Get price based on product type using enum
-                $priceField = $productTypeEnum->getPriceField();
-                $price = floatval($product->{$priceField} ?? 0);
+                // Use stored unit_price from cart (calculated when added to cart)
+                // This prevents price manipulation and ensures consistent pricing
+                $unitPrice = isset($cartItem['unit_price']) ? floatval($cartItem['unit_price']) : 0;
 
-                $discount = floatval($product->discount ?? 0);
-                $itemTotal = $quantity * ($price - $discount);
+                // Fallback: calculate price if not stored (legacy carts)
+                if ($unitPrice === 0) {
+                    $priceField = $productTypeEnum->getPriceField();
+                    $price = floatval($product->{$priceField} ?? 0);
+                    $discount = floatval($product->discount ?? 0);
+                    $unitPrice = $price - $discount;
+
+                    // For OSRS currency, recalculate based on metadata
+                    if ($productType === 'currency' && isset($product->price_per_million) && $product->price_per_million > 0 && isset($cartItem['metadata']['gold_amount'])) {
+                        $goldInMillions = floatval($cartItem['metadata']['gold_amount']) / 1000000;
+                        $unitPrice = floatval($product->price_per_million) * $goldInMillions;
+                    }
+                    // For package-based services
+                    elseif ($productType === 'service' && isset($cartItem['metadata']['package_price'])) {
+                        $unitPrice = floatval($cartItem['metadata']['package_price']);
+                    }
+                }
+
+                $itemTotal = $quantity * $unitPrice;
                 $subtotal += $itemTotal;
 
                 $orderItem = [
@@ -135,8 +152,8 @@ class OrderController extends Controller
                     'product_images' => $product->images ?? [],
                     'game_name' => $product->game ? $product->game->title : null,
                     'quantity' => $quantity,
-                    'price' => $price,
-                    'discount' => $discount,
+                    'price' => $unitPrice, // Store unit price (already calculated including OSRS/package pricing)
+                    'discount' => 0, // Discount already factored into unit price
                     'total' => $itemTotal,
                     'status' => 'pending',
                 ];
