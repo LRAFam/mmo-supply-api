@@ -94,6 +94,7 @@ class MessageController extends Controller
                 return [
                     'id' => $message->id,
                     'message' => $message->message,
+                    'metadata' => $message->metadata,
                     'sender' => [
                         'id' => $message->sender->id,
                         'name' => $message->sender->name,
@@ -113,9 +114,16 @@ class MessageController extends Controller
     {
         $request->validate([
             'recipient_id' => 'required|exists:users,id',
-            'message' => 'required|string|max:5000',
+            'message' => 'nullable|string|max:5000',
             'order_id' => 'nullable|exists:orders,id',
+            'attachments' => 'nullable|array|max:5',
+            'attachments.*' => 'file|mimes:jpg,jpeg,png,gif,webp|max:5120', // 5MB max per file
         ]);
+
+        // Require either message or attachments
+        if (empty($request->message) && empty($request->attachments)) {
+            return response()->json(['error' => 'Message or attachments required'], 400);
+        }
 
         $user = $request->user();
         $recipientId = $request->recipient_id;
@@ -128,12 +136,35 @@ class MessageController extends Controller
         // Find or create conversation
         $conversation = Conversation::findOrCreate($user->id, $recipientId, $request->order_id);
 
+        // Handle file uploads
+        $attachments = [];
+        if ($request->hasFile('attachments')) {
+            foreach ($request->file('attachments') as $file) {
+                $path = $file->store('message-attachments', 's3');
+                $url = \Storage::disk('s3')->url($path);
+
+                $attachments[] = [
+                    'type' => 'image',
+                    'url' => $url,
+                    'filename' => $file->getClientOriginalName(),
+                    'size' => $file->getSize(),
+                ];
+            }
+        }
+
+        // Prepare metadata
+        $metadata = [];
+        if (!empty($attachments)) {
+            $metadata['attachments'] = $attachments;
+        }
+
         // Create message
         $message = Message::create([
             'conversation_id' => $conversation->id,
             'sender_id' => $user->id,
-            'message' => $request->message,
+            'message' => $request->message ?? '',
             'type' => 'user',
+            'metadata' => empty($metadata) ? null : $metadata,
         ]);
 
         // Update conversation last message time
@@ -164,6 +195,7 @@ class MessageController extends Controller
                 'id' => $message->id,
                 'conversation_id' => $conversation->id,
                 'message' => $message->message,
+                'metadata' => $message->metadata,
                 'sender' => [
                     'id' => $user->id,
                     'name' => $user->name,
@@ -177,6 +209,10 @@ class MessageController extends Controller
                 'message' => $aiMessage->message,
                 'created_at' => $aiMessage->created_at,
             ] : null,
+            'conversation' => [
+                'id' => $conversation->id,
+                'order_id' => $conversation->order_id,
+            ],
         ], 201);
     }
 
@@ -283,5 +319,29 @@ class MessageController extends Controller
                         "Just ask me anything - try \"What's my wallet balance?\" or \"How many achievement points do I have?\"",
             'is_read' => false,
         ]);
+    }
+
+    /**
+     * Send a system message about an order (static helper for OrderController)
+     */
+    public static function sendOrderSystemMessage(int $buyerId, int $sellerId, int $orderId, string $message, string $type = 'order_created'): void
+    {
+        // Find or create conversation between buyer and seller
+        $conversation = Conversation::findOrCreate($buyerId, $sellerId, $orderId);
+
+        // Create system message
+        Message::create([
+            'conversation_id' => $conversation->id,
+            'sender_id' => $buyerId, // System message sent from buyer's side
+            'message' => $message,
+            'type' => 'system',
+            'metadata' => [
+                'order_id' => $orderId,
+                'system_type' => $type,
+            ],
+        ]);
+
+        // Update conversation last message time
+        $conversation->update(['last_message_at' => now()]);
     }
 }

@@ -221,6 +221,36 @@ class OrderController extends Controller
                 );
             }
 
+            // Send initial order message to each seller
+            $frontendUrl = config('app.frontend_url');
+            foreach ($orderItems as $item) {
+                $sellerOrderUrl = "{$frontendUrl}/seller/orders/{$order->id}";
+
+                // Get product type for URL (pluralize for route)
+                $productTypePlural = $item['product_type'] . 's'; // service -> services, account -> accounts, etc.
+                $productUrl = "{$frontendUrl}/{$productTypePlural}/{$item['product_id']}";
+
+                $orderDetails = "📦 **New Order #{$order->order_number}**\n\n";
+                $orderDetails .= "**Product:** [{$item['product_name']}]({$productUrl})\n";
+                $orderDetails .= "**Quantity:** {$item['quantity']}\n";
+                $orderDetails .= "**Total:** $" . number_format($item['total'], 2) . "\n\n";
+
+                if ($request->buyer_notes) {
+                    $orderDetails .= "**Buyer Notes:**\n{$request->buyer_notes}\n\n";
+                }
+
+                $orderDetails .= "➡️ [View Order Details]({$sellerOrderUrl})\n\n";
+                $orderDetails .= "Please review the order details and start processing this order.";
+
+                MessageController::sendOrderSystemMessage(
+                    $user->id,
+                    $item['seller_id'],
+                    $order->id,
+                    $orderDetails,
+                    'order_created'
+                );
+            }
+
             // Process payment based on method
             if ($request->payment_method === 'wallet') {
                 $wallet = $user->getOrCreateWallet();
@@ -724,6 +754,48 @@ class OrderController extends Controller
                     status: $request->status,
                     orderTitle: $orderTitle
                 );
+
+                // Send status update message to conversation with each seller
+                $frontendUrl = config('app.frontend_url');
+                foreach ($order->items as $item) {
+                    $statusEmoji = match($request->status) {
+                        'pending' => '⏳',
+                        'processing' => '⚙️',
+                        'delivered' => '📦',
+                        'completed' => '✅',
+                        'cancelled' => '❌',
+                        default => '📋'
+                    };
+
+                    // Determine if the user updating is the seller or buyer
+                    $isSeller = $item->seller_id === $user->id;
+                    $orderUrl = $isSeller
+                        ? "{$frontendUrl}/seller/orders/{$order->id}"
+                        : "{$frontendUrl}/orders/{$order->id}";
+
+                    // Get product URL
+                    $productTypePlural = $item->product_type . 's';
+                    $productUrl = "{$frontendUrl}/{$productTypePlural}/{$item->product_id}";
+
+                    $statusMessage = "{$statusEmoji} **Order Status Updated**\n\n";
+                    $statusMessage .= "**Order:** #{$order->order_number}\n";
+                    $statusMessage .= "**Product:** [{$item->product_name}]({$productUrl})\n";
+                    $statusMessage .= "**New Status:** " . ucfirst($request->status) . "\n";
+
+                    if ($request->seller_notes) {
+                        $statusMessage .= "\n**Seller Notes:**\n{$request->seller_notes}\n";
+                    }
+
+                    $statusMessage .= "\n➡️ [View Order Details]({$orderUrl})";
+
+                    MessageController::sendOrderSystemMessage(
+                        $order->user_id,
+                        $item->seller_id,
+                        $order->id,
+                        $statusMessage,
+                        'order_status_updated'
+                    );
+                }
             }
 
             DB::commit();
