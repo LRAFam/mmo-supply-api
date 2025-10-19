@@ -107,8 +107,15 @@ class CartController extends Controller
             $discount = floatval($product->discount ?? 0);
             $discountPrice = $product->discount_price ? floatval($product->discount_price) : null;
 
+            // For OSRS currency with price_per_million, calculate based on gold amount
+            if ($productTypeEnum->singularize() === 'currency' &&
+                isset($product->price_per_million) && $product->price_per_million > 0 &&
+                isset($item['metadata']['gold_amount'])) {
+                $goldInMillions = floatval($item['metadata']['gold_amount']) / 1000000;
+                $finalPrice = floatval($product->price_per_million) * $goldInMillions;
+            }
             // For package-based services, use the package price from metadata
-            if ($productTypeEnum->singularize() === 'service' &&
+            elseif ($productTypeEnum->singularize() === 'service' &&
                 isset($item['metadata']['package_price'])) {
                 $finalPrice = floatval($item['metadata']['package_price']);
             } else {
@@ -126,25 +133,40 @@ class CartController extends Controller
                 $itemTitle .= ' - ' . $packageName;
             }
 
+            $itemData = [
+                'id' => $product->id,
+                'name' => $itemName,
+                'title' => $itemTitle,
+                'description' => $product->description ?? '',
+                'price' => $price,
+                'discount' => $discount,
+                'discount_price' => $discountPrice,
+                'images' => $product->images ?? [],
+                'game' => $product->game ? [
+                    'id' => $product->game->id,
+                    'title' => $product->game->title,
+                ] : null,
+            ];
+
+            // For OSRS currency, include price_per_million and stock info
+            if ($productTypeEnum->singularize() === 'currency') {
+                if (isset($product->price_per_million)) {
+                    $itemData['price_per_million'] = floatval($product->price_per_million);
+                }
+                if (isset($product->currency_stock_amount)) {
+                    $itemData['currency_stock_amount'] = $product->currency_stock_amount;
+                }
+                if (isset($product->listing_intent)) {
+                    $itemData['listing_intent'] = $product->listing_intent;
+                }
+            }
+
             $cartItem = [
                 'id' => $productId . '-' . $productTypeEnum->singularize(),
                 'product_type' => $productTypeEnum->singularize(),
                 'product_id' => $productId,
                 'quantity' => $item['quantity'],
-                'item' => [
-                    'id' => $product->id,
-                    'name' => $itemName,
-                    'title' => $itemTitle,
-                    'description' => $product->description ?? '',
-                    'price' => $price,
-                    'discount' => $discount,
-                    'discount_price' => $discountPrice,
-                    'images' => $product->images ?? [],
-                    'game' => $product->game ? [
-                        'id' => $product->game->id,
-                        'title' => $product->game->title,
-                    ] : null,
-                ],
+                'item' => $itemData,
                 'finalPrice' => $finalPrice,
             ];
 
