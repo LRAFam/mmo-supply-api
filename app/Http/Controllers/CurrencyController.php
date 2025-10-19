@@ -33,6 +33,13 @@ class CurrencyController extends BaseProductController
             'max_amount' => 'nullable|integer|min:1',
             'amount' => 'nullable|string',
             'bulk_pricing' => 'nullable|array',
+
+            // OSRS-specific fields for bulk stock currency
+            'currency_stock_amount' => 'nullable|string', // e.g., "400M", "1B", "10B"
+            'price_per_million' => 'nullable|numeric|min:0', // Rate per 1M gold
+            'listing_intent' => 'nullable|string|in:selling,buying', // Whether selling or buying gold
+            'min_quantity' => 'nullable|integer|min:1',
+            'max_quantity' => 'nullable|integer|min:1',
         ]);
     }
 }
