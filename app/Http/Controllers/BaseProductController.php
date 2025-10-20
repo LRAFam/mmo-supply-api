@@ -128,9 +128,7 @@ abstract class BaseProductController extends Controller
         $productType = $this->getProductType()->value;
         $similarService = new SimilarListingsService();
         $similar = $similarService->findSimilar($productType, $id);
-        // Explicitly load user and game relationships to ensure they're included in JSON response
-        $similar->load('user', 'game');
-
+        // Note: user and game relationships are already loaded by SimilarListingsService
 
         return response()->json([
             'similar_listings' => $similar
