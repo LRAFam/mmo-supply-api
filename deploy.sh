@@ -45,3 +45,17 @@ $FORGE_PHP artisan migrate --force
 $ACTIVATE_RELEASE()
 
 $RESTART_QUEUES()
+
+# Restart Reverb WebSocket server via Supervisor
+# Copy the Supervisor config if it doesn't exist
+if [ ! -f /etc/supervisor/conf.d/reverb.conf ]; then
+    echo "Installing Reverb Supervisor config..."
+    sudo cp $FORGE_SITE_PATH/current/reverb.conf /etc/supervisor/conf.d/reverb.conf
+    sudo supervisorctl reread
+    sudo supervisorctl update
+fi
+
+# Restart Reverb
+sudo supervisorctl restart reverb
+
+echo "Reverb WebSocket server restarted via Supervisor"
