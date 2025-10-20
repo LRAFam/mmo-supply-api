@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Events\MessageSent;
 use App\Models\Conversation;
 use App\Models\Message;
 use App\Models\User;
@@ -167,6 +168,9 @@ class MessageController extends Controller
             'metadata' => empty($metadata) ? null : $metadata,
         ]);
 
+        // Broadcast message to real-time listeners
+        broadcast(new MessageSent($message))->toOthers();
+
         // Update conversation last message time
         $conversation->update(['last_message_at' => now()]);
 
@@ -184,6 +188,9 @@ class MessageController extends Controller
                 'type' => 'ai_agent',
                 'is_read' => false,
             ]);
+
+            // Broadcast AI message
+            broadcast(new MessageSent($aiMessage))->toOthers();
 
             // Update conversation time again
             $conversation->update(['last_message_at' => now()]);
@@ -330,7 +337,7 @@ class MessageController extends Controller
         $conversation = Conversation::findOrCreate($buyerId, $sellerId, $orderId);
 
         // Create system message
-        Message::create([
+        $systemMessage = Message::create([
             'conversation_id' => $conversation->id,
             'sender_id' => $buyerId, // System message sent from buyer's side
             'message' => $message,
@@ -340,6 +347,9 @@ class MessageController extends Controller
                 'system_type' => $type,
             ],
         ]);
+
+        // Broadcast system message
+        broadcast(new MessageSent($systemMessage))->toOthers();
 
         // Update conversation last message time
         $conversation->update(['last_message_at' => now()]);
