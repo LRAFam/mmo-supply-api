@@ -89,11 +89,18 @@ class Conversation extends Model
         // Ensure consistent ordering
         [$minId, $maxId] = $userOneId < $userTwoId ? [$userOneId, $userTwoId] : [$userTwoId, $userOneId];
 
+        // If order_id is provided, include it in the search criteria
+        $searchCriteria = [
+            'user_one_id' => $minId,
+            'user_two_id' => $maxId,
+        ];
+
+        if ($orderId !== null) {
+            $searchCriteria['order_id'] = $orderId;
+        }
+
         return self::firstOrCreate(
-            [
-                'user_one_id' => $minId,
-                'user_two_id' => $maxId,
-            ],
+            $searchCriteria,
             [
                 'order_id' => $orderId,
                 'last_message_at' => now(),
