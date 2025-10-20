@@ -161,11 +161,11 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Messaging
     Route::get('/messages/conversations', [MessageController::class, 'getConversations']);
+    Route::get('/messages/unread-count', [MessageController::class, 'getUnreadCount']);
     Route::get('/messages/{conversationId}', [MessageController::class, 'getMessages']);
     Route::post('/messages/send', [MessageController::class, 'sendMessage']);
     Route::post('/messages/send-to-conversation', [MessageController::class, 'sendToConversation']);
     Route::post('/messages/start', [MessageController::class, 'startConversation']);
-    Route::get('/messages/unread-count', [MessageController::class, 'getUnreadCount']);
 
     // Notifications
     Route::get('/notifications', [App\Http\Controllers\NotificationController::class, 'index']);
