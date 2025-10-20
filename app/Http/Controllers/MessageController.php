@@ -63,11 +63,11 @@ class MessageController extends Controller
     /**
      * Get messages for a specific conversation
      */
-    public function getMessages(Request $request, int $conversationId): JsonResponse
+    public function getMessages(Request $request, string $conversationId): JsonResponse
     {
         $user = $request->user();
 
-        $conversation = Conversation::where('id', $conversationId)
+        $conversation = Conversation::where('id', (int) $conversationId)
             ->where(function ($query) use ($user) {
                 $query->where('user_one_id', $user->id)
                     ->orWhere('user_two_id', $user->id);
