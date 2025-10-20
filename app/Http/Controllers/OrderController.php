@@ -53,6 +53,17 @@ class OrderController extends Controller
         $isBuyer = $order->user_id === $userId;
         $isSeller = $order->items()->where('seller_id', $userId)->exists();
 
+        // If accessing via seller view (indicated by view=seller query param), enforce seller-only access
+        if ($request->query('view') === 'seller' && !$isSeller) {
+            return response()->json(['error' => 'You are not a seller on this order'], 403);
+        }
+
+        // If accessing via buyer view (indicated by view=buyer query param), enforce buyer-only access
+        if ($request->query('view') === 'buyer' && !$isBuyer) {
+            return response()->json(['error' => 'You are not the buyer of this order'], 403);
+        }
+
+        // General authorization: must be either buyer or seller
         if (!$isBuyer && !$isSeller) {
             return response()->json(['error' => 'Unauthorized access to this order'], 403);
         }
