@@ -42,12 +42,25 @@ use Illuminate\Support\Facades\Broadcast;
 
 // Broadcasting authentication for token-based auth
 Route::middleware('auth:sanctum')->post('/broadcasting/auth', function (Request $request) {
+    \Log::info('Broadcasting auth attempt', [
+        'user_id' => $request->user()?->id,
+        'channel' => $request->input('channel_name'),
+        'socket_id' => $request->input('socket_id'),
+    ]);
+
     try {
         $response = Broadcast::auth($request);
+
+        \Log::info('Broadcasting auth success', [
+            'user_id' => $request->user()?->id,
+            'channel' => $request->input('channel_name'),
+        ]);
+
         return $response;
     } catch (\Exception $e) {
         \Log::error('Broadcasting auth exception', [
             'error' => $e->getMessage(),
+            'trace' => $e->getTraceAsString(),
             'user_id' => $request->user()?->id,
             'channel' => $request->input('channel_name'),
         ]);
