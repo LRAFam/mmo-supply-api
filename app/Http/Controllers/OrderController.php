@@ -62,12 +62,33 @@ class OrderController extends Controller
         $order->load(['items.seller', 'items.reviews', 'buyer']);
 
         // Find the conversation for this order between the current user and the buyer
+        // First try to find conversation with this specific order_id
         $conversation = \App\Models\Conversation::where('order_id', $order->id)
             ->where(function ($query) use ($userId) {
                 $query->where('user_one_id', $userId)
                       ->orWhere('user_two_id', $userId);
             })
             ->first();
+
+        // If not found and this is a seller viewing, try to find conversation between buyer and current seller
+        // This handles legacy conversations created before order_id was properly set
+        if (!$conversation && $isSeller) {
+            $buyerId = $order->user_id;
+            $conversation = \App\Models\Conversation::where(function ($query) use ($userId, $buyerId) {
+                $query->where(function ($q) use ($userId, $buyerId) {
+                    $q->where('user_one_id', $userId)->where('user_two_id', $buyerId);
+                })->orWhere(function ($q) use ($userId, $buyerId) {
+                    $q->where('user_one_id', $buyerId)->where('user_two_id', $userId);
+                });
+            })
+            ->whereNull('order_id') // Only match conversations without order_id (legacy)
+            ->first();
+
+            // If we found a legacy conversation, update it with the order_id
+            if ($conversation) {
+                $conversation->update(['order_id' => $order->id]);
+            }
+        }
 
         // Add conversation_id to the order response
         $orderData = $order->toArray();
