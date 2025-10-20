@@ -9,13 +9,12 @@ Broadcast::channel('App.Models.User.{id}', function ($user, $id) {
 
 // Conversation channels - user can access if they're part of the conversation
 Broadcast::channel('conversation.{conversationId}', function ($user, $conversationId) {
+    error_log("Channel auth for conversation.$conversationId - User: $user->id");
+
     $conversation = Conversation::find($conversationId);
 
     if (!$conversation) {
-        \Log::warning('Broadcasting auth failed: Conversation not found', [
-            'conversation_id' => $conversationId,
-            'user_id' => $user->id,
-        ]);
+        error_log("Channel auth FAILED: Conversation $conversationId not found");
         return false;
     }
 
@@ -24,13 +23,12 @@ Broadcast::channel('conversation.{conversationId}', function ($user, $conversati
         || (int) $user->id === (int) $conversation->user_two_id;
 
     if (!$isAuthorized) {
-        \Log::warning('Broadcasting auth failed: User not part of conversation', [
-            'conversation_id' => $conversationId,
-            'user_id' => $user->id,
-            'user_one_id' => $conversation->user_one_id,
-            'user_two_id' => $conversation->user_two_id,
-        ]);
+        error_log("Channel auth FAILED: User $user->id not part of conversation $conversationId (users: $conversation->user_one_id, $conversation->user_two_id)");
+        return false;
     }
 
-    return $isAuthorized;
+    error_log("Channel auth SUCCESS: User $user->id authorized for conversation $conversationId");
+
+    // Return user data for successful authorization
+    return ['id' => $user->id, 'name' => $user->name];
 });
