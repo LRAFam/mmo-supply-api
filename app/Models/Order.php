@@ -49,6 +49,11 @@ class Order extends Model
         return $this->hasMany(OrderItem::class);
     }
 
+    public function conversation()
+    {
+        return $this->hasOne(Conversation::class);
+    }
+
     protected static function boot()
     {
         parent::boot();

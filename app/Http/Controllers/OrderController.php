@@ -57,10 +57,23 @@ class OrderController extends Controller
             return response()->json(['error' => 'Unauthorized access to this order'], 403);
         }
 
-        // Load relationships
+        // Load relationships including conversation for the seller
+        // For orders with multiple sellers, we'll find the conversation between buyer and current user (seller)
         $order->load(['items.seller', 'items.reviews', 'buyer']);
 
-        return response()->json($order);
+        // Find the conversation for this order between the current user and the buyer
+        $conversation = \App\Models\Conversation::where('order_id', $order->id)
+            ->where(function ($query) use ($userId) {
+                $query->where('user_one_id', $userId)
+                      ->orWhere('user_two_id', $userId);
+            })
+            ->first();
+
+        // Add conversation_id to the order response
+        $orderData = $order->toArray();
+        $orderData['conversation_id'] = $conversation ? $conversation->id : null;
+
+        return response()->json($orderData);
     }
 
     public function store(Request $request): JsonResponse
