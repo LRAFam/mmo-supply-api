@@ -12,10 +12,25 @@ Broadcast::channel('conversation.{conversationId}', function ($user, $conversati
     $conversation = Conversation::find($conversationId);
 
     if (!$conversation) {
+        \Log::warning('Broadcasting auth failed: Conversation not found', [
+            'conversation_id' => $conversationId,
+            'user_id' => $user->id,
+        ]);
         return false;
     }
 
     // User can access if they're either user_one or user_two in the conversation
-    return (int) $user->id === (int) $conversation->user_one_id
+    $isAuthorized = (int) $user->id === (int) $conversation->user_one_id
         || (int) $user->id === (int) $conversation->user_two_id;
+
+    if (!$isAuthorized) {
+        \Log::warning('Broadcasting auth failed: User not part of conversation', [
+            'conversation_id' => $conversationId,
+            'user_id' => $user->id,
+            'user_one_id' => $conversation->user_one_id,
+            'user_two_id' => $conversation->user_two_id,
+        ]);
+    }
+
+    return $isAuthorized;
 });
