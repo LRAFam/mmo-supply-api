@@ -38,6 +38,12 @@ use App\Http\Controllers\PayPalPayoutController;
 use App\Http\Controllers\PayPalCheckoutController;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Broadcast;
+
+// Broadcasting authentication for token-based auth
+Route::middleware('auth:sanctum')->post('/broadcasting/auth', function (Request $request) {
+    return Broadcast::auth($request);
+});
 
 Route::middleware('auth:sanctum')->get('/user', [UserController::class, 'me']);
 

@@ -46,8 +46,8 @@ class DiscordBotController extends Controller
                 ]);
 
             case 'active':
-                $users = User::withCount(['orders' as 'total_transactions'])
-                    ->orderBy('total_transactions', 'desc')
+                $users = User::withCount('orders')
+                    ->orderBy('orders_count', 'desc')
                     ->limit(10)
                     ->get(['id', 'name']);
 
