@@ -109,6 +109,89 @@ class MessageController extends Controller
     }
 
     /**
+     * Send a message to an existing conversation
+     */
+    public function sendToConversation(Request $request): JsonResponse
+    {
+        $request->validate([
+            'conversation_id' => 'required|exists:conversations,id',
+            'message' => 'nullable|string|max:5000',
+            'attachments' => 'nullable|array|max:5',
+            'attachments.*' => 'file|mimes:jpg,jpeg,png,gif,webp|max:5120', // 5MB max per file
+        ]);
+
+        // Require either message or attachments
+        if (empty($request->message) && empty($request->attachments)) {
+            return response()->json(['error' => 'Message or attachments required'], 400);
+        }
+
+        $user = $request->user();
+        $conversationId = $request->conversation_id;
+
+        // Verify user is part of this conversation
+        $conversation = Conversation::where('id', $conversationId)
+            ->where(function ($query) use ($user) {
+                $query->where('user_one_id', $user->id)
+                    ->orWhere('user_two_id', $user->id);
+            })
+            ->firstOrFail();
+
+        // Handle file uploads
+        $attachments = [];
+        if ($request->hasFile('attachments')) {
+            foreach ($request->file('attachments') as $file) {
+                $path = $file->store('message-attachments', 's3');
+                $url = \Storage::disk('s3')->url($path);
+
+                $attachments[] = [
+                    'type' => 'image',
+                    'url' => $url,
+                    'filename' => $file->getClientOriginalName(),
+                    'size' => $file->getSize(),
+                ];
+            }
+        }
+
+        // Prepare metadata
+        $metadata = [];
+        if (!empty($attachments)) {
+            $metadata['attachments'] = $attachments;
+        }
+
+        // Create message
+        $message = Message::create([
+            'conversation_id' => $conversation->id,
+            'sender_id' => $user->id,
+            'message' => $request->message ?? '',
+            'type' => 'user',
+            'metadata' => empty($metadata) ? null : $metadata,
+        ]);
+
+        // Broadcast message to real-time listeners
+        broadcast(new MessageSent($message))->toOthers();
+
+        // Update conversation last message time
+        $conversation->update(['last_message_at' => now()]);
+
+        return response()->json([
+            'success' => true,
+            'message' => [
+                'id' => $message->id,
+                'conversation_id' => $conversation->id,
+                'message' => $message->message,
+                'metadata' => $message->metadata,
+                'sender' => [
+                    'id' => $user->id,
+                    'name' => $user->name,
+                ],
+                'is_mine' => true,
+                'is_read' => false,
+                'created_at' => $message->created_at,
+            ],
+        ], 201);
+    }
+
+    /**
      * Send a message
      */
     public function sendMessage(Request $request): JsonResponse
