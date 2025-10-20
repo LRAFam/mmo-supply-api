@@ -42,29 +42,28 @@ use Illuminate\Support\Facades\Broadcast;
 
 // Broadcasting authentication for token-based auth
 Route::middleware('auth:sanctum')->post('/broadcasting/auth', function (Request $request) {
-    \Log::info('Broadcasting auth attempt', [
-        'user_id' => $request->user()?->id,
-        'channel' => $request->input('channel_name'),
-        'socket_id' => $request->input('socket_id'),
-    ]);
+    $user = $request->user();
+    $channelName = $request->input('channel_name');
+
+    error_log("Broadcasting auth attempt - User: " . ($user?->id ?? 'null') . ", Channel: " . $channelName);
 
     try {
         $response = Broadcast::auth($request);
 
-        \Log::info('Broadcasting auth success', [
-            'user_id' => $request->user()?->id,
-            'channel' => $request->input('channel_name'),
-        ]);
+        error_log("Broadcasting auth SUCCESS - User: " . ($user?->id ?? 'null') . ", Channel: " . $channelName);
 
         return $response;
     } catch (\Exception $e) {
-        \Log::error('Broadcasting auth exception', [
-            'error' => $e->getMessage(),
-            'trace' => $e->getTraceAsString(),
-            'user_id' => $request->user()?->id,
-            'channel' => $request->input('channel_name'),
-        ]);
-        return response()->json(['message' => 'Unauthorized'], 403);
+        error_log("Broadcasting auth EXCEPTION - User: " . ($user?->id ?? 'null') . ", Channel: " . $channelName . ", Error: " . $e->getMessage());
+
+        return response()->json([
+            'message' => 'Channel authorization failed',
+            'debug' => [
+                'user_id' => $user?->id,
+                'channel' => $channelName,
+                'error' => $e->getMessage(),
+            ]
+        ], 403);
     }
 });
 
