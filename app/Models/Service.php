@@ -57,7 +57,7 @@ class Service extends Model
         'featured_until' => 'datetime',
     ];
 
-    protected $appends = ['images_urls'];
+    protected $appends = ['images_urls', 'stock', 'delivery_time', 'average_rating', 'reviews_count'];
 
     /**
      * Get full URLs for all images
@@ -105,5 +105,23 @@ class Service extends Model
     public function getAverageRatingAttribute()
     {
         return $this->reviews()->avg('rating') ?? 0;
+    }
+
+    public function getReviewsCountAttribute()
+    {
+        return $this->reviews()->count();
+    }
+
+    public function getStockAttribute()
+    {
+        // Services don't have stock - they're always available unless max_concurrent_orders is reached
+        // Return 999 to indicate "always available" for now
+        return 999;
+    }
+
+    public function getDeliveryTimeAttribute()
+    {
+        // Return estimated_time or a default
+        return $this->estimated_time ?? 'Varies';
     }
 }

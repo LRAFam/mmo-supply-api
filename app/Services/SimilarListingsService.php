@@ -28,7 +28,7 @@ class SimilarListingsService
         $candidates = $model::where('game_id', $product->game_id)
             ->where('id', '!=', $product->id)
             ->where('is_active', true)
-            ->with(['user', 'game'])
+            ->with(['user', 'game', 'reviews'])
             ->get();
 
         // For currencies, use much lower threshold since they're commodities
