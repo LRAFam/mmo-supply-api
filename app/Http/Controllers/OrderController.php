@@ -309,24 +309,37 @@ class OrderController extends Controller
                 $achievementService = app(AchievementCheckService::class);
                 $achievementService->checkAndAutoClaimAchievements($user);
             } elseif ($request->payment_method === 'stripe') {
-                // Create Stripe payment intent
+                // Create Stripe payment intent with Connect escrow
+                // Funds go to Stripe escrow, not our platform account
                 $stripeService = new StripePaymentService();
-                $paymentIntent = $stripeService->createOrderPaymentIntent($user, $total, $order->id);
 
-                $order->update([
-                    'payment_status' => 'pending',
-                    'stripe_payment_intent_id' => $paymentIntent->id
-                ]);
+                try {
+                    // Load order items with seller relationship for escrow setup
+                    $order->load('items.seller');
 
-                DB::commit();
+                    $paymentIntent = $stripeService->createOrderPaymentIntent($user, $order);
 
-                // Return payment intent client secret for frontend
-                return response()->json([
-                    'message' => 'Order created successfully',
-                    'order' => $order->load('items'),
-                    'requires_payment' => true,
-                    'payment_intent_client_secret' => $paymentIntent->client_secret,
-                ], 201);
+                    $order->update([
+                        'payment_status' => 'pending',
+                        'stripe_payment_intent_id' => $paymentIntent->id
+                    ]);
+
+                    DB::commit();
+
+                    // Return payment intent client secret for frontend
+                    return response()->json([
+                        'message' => 'Order created successfully',
+                        'order' => $order->load('items'),
+                        'requires_payment' => true,
+                        'payment_intent_client_secret' => $paymentIntent->client_secret,
+                    ], 201);
+                } catch (\Exception $e) {
+                    DB::rollBack();
+                    return response()->json([
+                        'error' => 'Failed to create payment: ' . $e->getMessage(),
+                        'hint' => 'Seller may need to complete Stripe account setup'
+                    ], 400);
+                }
             }
 
             DB::commit();
@@ -532,17 +545,41 @@ class OrderController extends Controller
             return;
         }
 
-        // Get effective platform fee with perks applied
-        $baseFeePercentage = $seller->getPlatformFeePercentage();
-        $feePercentage = $seller->getEffectivePlatformFee($baseFeePercentage);
-        $platformFee = $orderItem->total * ($feePercentage / 100);
-        $sellerEarnings = $orderItem->total - $platformFee;
+        // Get the order to check payment method
+        $order = Order::findOrFail($orderId);
 
-        // Credit seller wallet with earnings after platform fee
-        $sellerWallet = $seller->getOrCreateWallet();
-        $sellerWallet->receiveSale($sellerEarnings, $orderId);
+        // If payment was made via Stripe, release escrow via Stripe Connect
+        if ($order->payment_method === 'stripe' && $order->stripe_payment_intent_id) {
+            try {
+                $stripeService = new StripePaymentService();
+                $stripeService->releaseEscrowToSeller($order);
 
-        // Track sale for tier progression
+                // Stripe automatically transfers funds to seller's connected account
+                // Platform fee was already collected via application_fee_amount
+                // No need to manually credit wallets - Stripe handles it
+            } catch (\Exception $e) {
+                // Log error but don't fail the entire process
+                \Log::error('Failed to release Stripe escrow', [
+                    'order_id' => $orderId,
+                    'error' => $e->getMessage()
+                ]);
+                throw $e;
+            }
+        }
+        // For wallet payments, use the old flow (credit seller wallet)
+        elseif ($order->payment_method === 'wallet') {
+            // Get effective platform fee with perks applied
+            $baseFeePercentage = $seller->getPlatformFeePercentage();
+            $feePercentage = $seller->getEffectivePlatformFee($baseFeePercentage);
+            $platformFee = $orderItem->total * ($feePercentage / 100);
+            $sellerEarnings = $orderItem->total - $platformFee;
+
+            // Credit seller wallet with earnings after platform fee
+            $sellerWallet = $seller->getOrCreateWallet();
+            $sellerWallet->receiveSale($sellerEarnings, $orderId);
+        }
+
+        // Track sale for tier progression (for both payment methods)
         $seller->addSale($orderItem->total);
 
         // Update provider stats for this game

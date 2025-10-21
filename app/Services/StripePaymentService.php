@@ -41,19 +41,59 @@ class StripePaymentService
     }
 
     /**
-     * Create a payment intent for direct order payment
+     * Create a payment intent for direct order payment with Stripe Connect escrow
+     * Uses Destination Charges pattern - Stripe holds funds until release
+     *
+     * IMPORTANT: Currently supports single-seller orders only.
+     * For multi-seller orders, see documentation in Obsidian vault:
+     * /Projects/MMO Supply/03-Platform-Audit/Current-Payment-Flow-Analysis.md
+     *
+     * Two options for multi-seller:
+     * 1. Split Payment Intents (create one PaymentIntent per seller) - RECOMMENDED
+     * 2. Transfer Pattern (charge once, manual Transfers to each seller)
      */
-    public function createOrderPaymentIntent(User $user, float $amount, int $orderId, string $currency = 'usd')
+    public function createOrderPaymentIntent(User $buyer, $order, string $currency = 'usd')
     {
-        $amountInCents = (int) ($amount * 100);
+        $totalInCents = (int) ($order->total * 100);
+        $platformFeeInCents = (int) (($order->platform_fee ?? 0) * 100);
 
+        // Check for multi-seller orders
+        $uniqueSellers = $order->items->pluck('seller_id')->unique();
+        if ($uniqueSellers->count() > 1) {
+            throw new \Exception('Multi-seller orders are not yet supported with Stripe Connect escrow. Please separate items from different sellers into individual orders.');
+        }
+
+        // Get the seller from order items
+        $firstItem = $order->items->first();
+
+        if (!$firstItem) {
+            throw new \Exception('Order has no items');
+        }
+
+        $seller = $firstItem->seller;
+
+        if (!$seller || !$seller->stripe_account_id) {
+            throw new \Exception('Seller must connect a Stripe account before receiving payments. Please ensure the seller has completed Stripe onboarding.');
+        }
+
+        // Create PaymentIntent with Stripe Connect Destination Charges
+        // This means: Stripe holds the funds in escrow, not our platform
         $paymentIntent = PaymentIntent::create([
-            'amount' => $amountInCents,
+            'amount' => $totalInCents,
             'currency' => strtolower($currency),
-            'customer' => $this->getOrCreateCustomer($user),
+            'customer' => $this->getOrCreateCustomer($buyer),
+
+            // Stripe Connect escrow configuration
+            'on_behalf_of' => $seller->stripe_account_id,
+            'transfer_data' => [
+                'destination' => $seller->stripe_account_id,
+            ],
+            'application_fee_amount' => $platformFeeInCents,
+
             'metadata' => [
-                'user_id' => $user->id,
-                'order_id' => $orderId,
+                'buyer_id' => $buyer->id,
+                'order_id' => $order->id,
+                'seller_id' => $seller->id,
                 'type' => 'order_payment',
             ],
             'automatic_payment_methods' => [
@@ -211,6 +251,35 @@ class StripePaymentService
             return $paymentIntent;
         } catch (\Exception $e) {
             throw new \Exception('Failed to retrieve payment intent: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Release escrow to seller (capture the payment intent)
+     * For Stripe Connect Destination Charges, capturing the payment releases funds to seller
+     */
+    public function releaseEscrowToSeller($order)
+    {
+        $paymentIntentId = $order->stripe_payment_intent_id;
+
+        if (!$paymentIntentId) {
+            throw new \Exception('No payment intent found for this order');
+        }
+
+        try {
+            $paymentIntent = PaymentIntent::retrieve($paymentIntentId);
+
+            // If payment intent requires capture, capture it to release funds
+            if ($paymentIntent->status === 'requires_capture') {
+                $paymentIntent->capture();
+            }
+
+            // If already succeeded, funds are automatically transferred via transfer_data
+            // No additional action needed - Stripe handles the transfer automatically
+
+            return true;
+        } catch (\Exception $e) {
+            throw new \Exception('Failed to release escrow: ' . $e->getMessage());
         }
     }
 }
