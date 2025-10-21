@@ -96,6 +96,7 @@ class MessageController extends Controller
                     'id' => $message->id,
                     'message' => $message->message,
                     'metadata' => $message->metadata,
+                    'type' => $message->type ?? 'user',
                     'sender' => [
                         'id' => $message->sender->id,
                         'name' => $message->sender->name,
@@ -180,6 +181,7 @@ class MessageController extends Controller
                 'conversation_id' => $conversation->id,
                 'message' => $message->message,
                 'metadata' => $message->metadata,
+                'type' => $message->type,
                 'sender' => [
                     'id' => $user->id,
                     'name' => $user->name,
