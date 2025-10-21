@@ -105,6 +105,105 @@ class StripePaymentService
     }
 
     /**
+     * Create a payment intent for multi-seller orders using Transfer pattern
+     * Creates one PaymentIntent for the total amount, then creates Transfers to each seller
+     *
+     * This is the "Hybrid" approach recommended in the architecture docs
+     */
+    public function createMultiSellerPaymentIntent(User $buyer, array $orders, float $totalAmount, string $currency = 'usd')
+    {
+        $totalInCents = (int) ($totalAmount * 100);
+
+        // Validate all sellers have Stripe accounts
+        foreach ($orders as $order) {
+            $sellerId = $order->seller_id;
+            $seller = User::find($sellerId);
+
+            if (!$seller || !$seller->stripe_account_id) {
+                throw new \Exception("Seller {$sellerId} must connect a Stripe account before receiving payments. Please ensure all sellers have completed Stripe onboarding.");
+            }
+        }
+
+        // Create PaymentIntent for total amount (charged to buyer)
+        // No destination specified - funds go to platform, then we Transfer to sellers
+        $paymentIntent = PaymentIntent::create([
+            'amount' => $totalInCents,
+            'currency' => strtolower($currency),
+            'customer' => $this->getOrCreateCustomer($buyer),
+
+            'metadata' => [
+                'buyer_id' => $buyer->id,
+                'type' => 'multi_seller_order_payment',
+                'order_group_id' => $orders[0]->order_group_id ?? null,
+                'seller_count' => count($orders),
+            ],
+            'automatic_payment_methods' => [
+                'enabled' => true,
+            ],
+        ]);
+
+        return $paymentIntent;
+    }
+
+    /**
+     * Create Transfers to sellers after payment is confirmed
+     * Called after PaymentIntent succeeds (webhook or frontend confirmation)
+     */
+    public function createTransfersToSellers(string $paymentIntentId): array
+    {
+        // Get all orders associated with this PaymentIntent
+        $orders = \App\Models\Order::where('stripe_payment_intent_id', $paymentIntentId)->get();
+
+        if ($orders->isEmpty()) {
+            throw new \Exception("No orders found for PaymentIntent {$paymentIntentId}");
+        }
+
+        $transfers = [];
+
+        foreach ($orders as $order) {
+            $seller = User::find($order->seller_id);
+
+            if (!$seller || !$seller->stripe_account_id) {
+                // Log error but continue with other transfers
+                \Log::error("Cannot create transfer for order {$order->id}: Seller {$order->seller_id} missing Stripe account");
+                continue;
+            }
+
+            $sellerPayoutInCents = (int) ($order->seller_payout * 100);
+
+            // Create Transfer to seller's connected account
+            try {
+                $transfer = Transfer::create([
+                    'amount' => $sellerPayoutInCents,
+                    'currency' => 'usd',
+                    'destination' => $seller->stripe_account_id,
+                    'transfer_group' => $order->order_group_id,
+                    'metadata' => [
+                        'order_id' => $order->id,
+                        'order_number' => $order->order_number,
+                        'seller_id' => $seller->id,
+                        'platform_fee' => $order->platform_fee,
+                    ],
+                ]);
+
+                // Update order with transfer ID
+                $order->update([
+                    'stripe_transfer_id' => $transfer->id,
+                    'payment_status' => 'paid',
+                    'status' => 'processing',
+                ]);
+
+                $transfers[] = $transfer;
+            } catch (\Exception $e) {
+                \Log::error("Failed to create transfer for order {$order->id}: " . $e->getMessage());
+                throw $e;
+            }
+        }
+
+        return $transfers;
+    }
+
+    /**
      * Get or create Stripe customer for user
      */
     public function getOrCreateCustomer(User $user)

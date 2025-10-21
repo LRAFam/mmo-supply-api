@@ -36,6 +36,7 @@ use App\Http\Controllers\WishlistController;
 use App\Http\Controllers\CryptoPaymentController;
 use App\Http\Controllers\PayPalPayoutController;
 use App\Http\Controllers\PayPalCheckoutController;
+use App\Http\Controllers\ProfileController;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Broadcast;
@@ -74,10 +75,6 @@ Route::get('/stats', [StatsController::class, 'getPlatformStats']);
 
 // Public leaderboard (anyone can view rankings)
 Route::get('/leaderboard', [LeaderboardController::class, 'index']);
-
-// Public user profile (no auth required)
-Route::get('/users/{username}/public', [UserController::class, 'showPublic']);
-Route::get('/users/{user}', [UserController::class, 'show']);
 
 // Discord Bot API Routes (protected with custom middleware)
 Route::prefix('discord-bot')->middleware('discord.bot')->group(function () {
@@ -145,6 +142,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/orders/seller/all', [OrderController::class, 'sellerOrders']);
     Route::get('/orders/{id}', [OrderController::class, 'show']);
     Route::middleware('throttle:30,1')->post('/orders', [OrderController::class, 'store']);
+    Route::middleware('throttle:30,1')->post('/orders/multi-seller', [OrderController::class, 'createMultiSellerOrders']);
     Route::put('/orders/{id}/status', [OrderController::class, 'updateStatus']);
     Route::post('/orders/{orderId}/items/{itemId}/deliver', [OrderController::class, 'deliverItem']);
     Route::post('/orders/{orderId}/items/{itemId}/confirm-delivery', [OrderController::class, 'confirmDelivery']);
@@ -255,6 +253,31 @@ Route::middleware(['auth:sanctum', 'throttle:60,1'])->group(function () {
     Route::delete('/upload/image', [UploadController::class, 'deleteImage']);
 });
 
+// Profile Image Management (Avatar & Banner)
+Route::middleware(['auth:sanctum', 'throttle:20,1'])->prefix('profile')->name('profile.')->group(function () {
+    Route::get('/images', [ProfileController::class, 'getProfileImages'])->name('getImages');
+    Route::post('/avatar', [ProfileController::class, 'uploadAvatar'])->name('uploadAvatar');
+    Route::post('/banner', [ProfileController::class, 'uploadBanner'])->name('uploadBanner');
+    Route::delete('/avatar', [ProfileController::class, 'removeAvatar'])->name('removeAvatar');
+    Route::delete('/banner', [ProfileController::class, 'removeBanner'])->name('removeBanner');
+});
+
+// Payment Processor OAuth (Stripe Connect & PayPal)
+Route::middleware(['auth:sanctum'])->prefix('payment-processors')->name('payment-processors.')->group(function () {
+    // Status check - higher rate limit for development
+    Route::get('/status', [\App\Http\Controllers\PaymentProcessorController::class, 'getStatus'])->middleware('throttle:60,1')->name('status');
+
+    // Stripe Connect - stricter rate limit for OAuth flows
+    Route::post('/stripe/connect', [\App\Http\Controllers\PaymentProcessorController::class, 'stripeConnect'])->middleware('throttle:10,1')->name('stripe.connect');
+    Route::post('/stripe/callback', [\App\Http\Controllers\PaymentProcessorController::class, 'stripeCallback'])->name('stripe.callback')->withoutMiddleware(['auth:sanctum']);
+    Route::delete('/stripe/disconnect', [\App\Http\Controllers\PaymentProcessorController::class, 'stripeDisconnect'])->middleware('throttle:10,1')->name('stripe.disconnect');
+
+    // PayPal - stricter rate limit for OAuth flows
+    Route::post('/paypal/connect', [\App\Http\Controllers\PaymentProcessorController::class, 'paypalConnect'])->middleware('throttle:10,1')->name('paypal.connect');
+    Route::post('/paypal/callback', [\App\Http\Controllers\PaymentProcessorController::class, 'paypalCallback'])->name('paypal.callback')->withoutMiddleware(['auth:sanctum']);
+    Route::delete('/paypal/disconnect', [\App\Http\Controllers\PaymentProcessorController::class, 'paypalDisconnect'])->middleware('throttle:10,1')->name('paypal.disconnect');
+});
+
 // Seasons (Public endpoints)
 Route::get('/seasons/current', [SeasonController::class, 'current']);
 Route::get('/seasons', [SeasonController::class, 'index']);
@@ -345,6 +368,7 @@ Route::group(['prefix' => 'providers'], function () {
 Route::prefix('auth')->group(function () {
     Route::get('discord', [AuthController::class, 'redirectToProvider']);
     Route::get('discord/callback', [AuthController::class, 'handleProviderCallback']);
+    Route::post('discord/unlink', [AuthController::class, 'unlinkDiscord'])->middleware('auth:sanctum');
 
     // Rate limit authentication endpoints to prevent brute force attacks
     Route::middleware('throttle:10,1')->group(function () {
@@ -421,3 +445,9 @@ Route::middleware(['auth:sanctum'])->prefix('achievement-store')->group(function
     Route::post('/activate-cosmetic', [App\Http\Controllers\AchievementStoreController::class, 'activateCosmetic']);
     Route::get('/inventory', [App\Http\Controllers\AchievementStoreController::class, 'inventory']);
 });
+
+// Public user profile routes (specific routes MUST come before wildcard routes)
+Route::get('/users/{userId}/payment-methods', [UserController::class, 'getPaymentMethods'])->where('userId', '[0-9]+');
+Route::get('/users/{username}/public', [UserController::class, 'showPublic']);
+// Wildcard route MUST be last (catches username or ID)
+Route::get('/users/{user}', [UserController::class, 'show']);

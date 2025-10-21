@@ -38,33 +38,67 @@ class AuthController extends Controller
     /**
      * Handle the callback from the provider after authentication.
      */
-    public function handleProviderCallback(Request $request): RedirectResponse|JsonResponse
+    public function handleProviderCallback(Request $request): JsonResponse
     {
         try {
-            $user = Socialite::driver('discord')->user();
-            $existingUser = User::where('discord_id', $user->id)->first();
+            $discordUser = Socialite::driver('discord')->stateless()->user();
 
-            if ($existingUser) {
-                Auth::login($existingUser);
-            } else {
-                $newUser = User::create([
-                    'discord_id' => $user->id,
-                    'nickname' => $user->nickname,
-                    'name' => $user->name,
-                    'avatar' => $user->avatar,
-                    'email' => $user->email,
+            // Find or create user by discord_id
+            $user = User::where('discord_id', $discordUser->id)->first();
+
+            if ($user) {
+                // Update Discord info if user exists
+                $user->update([
+                    'discord_username' => $discordUser->nickname ?? $discordUser->name,
+                    'discord_avatar' => $discordUser->avatar,
+                    'discord_banner' => $discordUser->user['banner'] ?? null,
+                    'discord_accent_color' => $discordUser->user['accent_color'] ?? null,
                 ]);
-                Auth::login($newUser);
+            } else {
+                // Create new user with Discord info
+                $user = User::create([
+                    'discord_id' => $discordUser->id,
+                    'discord_username' => $discordUser->nickname ?? $discordUser->name,
+                    'discord_avatar' => $discordUser->avatar,
+                    'discord_banner' => $discordUser->user['banner'] ?? null,
+                    'discord_accent_color' => $discordUser->user['accent_color'] ?? null,
+                    'name' => $discordUser->name ?? $discordUser->nickname,
+                    'email' => $discordUser->email,
+                    'password' => \Hash::make(\Str::random(32)), // Random password for Discord-only users
+                    'email_verified_at' => now(), // Discord emails are pre-verified
+                ]);
             }
 
-            return redirect('/'); // Redirect to your desired route
+            // Generate API token
+            $token = $user->createToken('discord-auth')->plainTextToken;
+
+            return response()->json([
+                'success' => true,
+                'token' => $token,
+                'user' => [
+                    'id' => $user->id,
+                    'name' => $user->name,
+                    'email' => $user->email,
+                    'discord_id' => $user->discord_id,
+                    'discord_username' => $user->discord_username,
+                    'discord_avatar' => $user->discord_avatar,
+                    'discord_banner' => $user->discord_banner,
+                    'discord_accent_color' => $user->discord_accent_color,
+                    'avatar_url' => $user->getAvatarUrl(),
+                    'banner_url' => $user->getBannerUrl(),
+                    'accent_color' => $user->getAccentColor(),
+                ],
+            ], 200);
 
         } catch (\Exception $e) {
             Log::error('Discord authentication error: ' . $e->getMessage(), [
                 'exception' => $e,
                 'trace' => $e->getTraceAsString(),
             ]);
-            return response()->json(['error' => 'Unable to fetch Discord user data.'], 400);
+            return response()->json([
+                'success' => false,
+                'message' => 'Unable to authenticate with Discord. Please try again.',
+            ], 400);
         }
     }
 
@@ -410,5 +444,49 @@ class AuthController extends Controller
             'success' => true,
             'message' => 'Password reset successfully! You can now login with your new password.',
         ]);
+    }
+
+    /**
+     * Unlink Discord account from user.
+     */
+    public function unlinkDiscord(Request $request): JsonResponse
+    {
+        $user = $request->user();
+
+        if (!$user) {
+            return response()->json([
+                'success' => false,
+                'message' => 'User not authenticated',
+            ], 401);
+        }
+
+        if (!$user->discord_id) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No Discord account linked to this user',
+            ], 400);
+        }
+
+        try {
+            $user->discord_id = null;
+            $user->discord_username = null;
+            $user->discord_avatar = null;
+            $user->save();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Discord account unlinked successfully',
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Discord unlink error: ' . $e->getMessage(), [
+                'exception' => $e,
+                'user_id' => $user->id,
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to unlink Discord account',
+            ], 500);
+        }
     }
 }

@@ -63,7 +63,12 @@ class SimilarListingsService
             return collect();
         }
 
-        $normalizedTitle = $this->normalizeTitle($product->title);
+        $productTitle = $product->title ?? $product->name ?? '';
+        if (empty($productTitle)) {
+            return collect();
+        }
+
+        $normalizedTitle = $this->normalizeTitle($productTitle);
         $model = $this->getModel($type);
 
         return $model::where('game_id', $product->game_id)
@@ -71,7 +76,8 @@ class SimilarListingsService
             ->where('is_active', true)
             ->get()
             ->filter(function ($item) use ($normalizedTitle) {
-                return $this->normalizeTitle($item->title) === $normalizedTitle;
+                $itemTitle = $item->title ?? $item->name ?? '';
+                return $this->normalizeTitle($itemTitle) === $normalizedTitle;
             })
             ->values();
     }
@@ -83,10 +89,19 @@ class SimilarListingsService
     {
         $score = 0;
 
+        // Get titles (fallback to name if title is null)
+        $title1 = $product1->title ?? $product1->name ?? '';
+        $title2 = $product2->title ?? $product2->name ?? '';
+
+        // If either title is empty, return 0 score
+        if (empty($title1) || empty($title2)) {
+            return 0;
+        }
+
         // For currencies, be much more aggressive with matching
         if ($type === 'currency') {
-            $normalized1 = $this->normalizeCurrencyTitle($product1->title);
-            $normalized2 = $this->normalizeCurrencyTitle($product2->title);
+            $normalized1 = $this->normalizeCurrencyTitle($title1);
+            $normalized2 = $this->normalizeCurrencyTitle($title2);
 
             // If both contain same currency type (gold, gp, coins, etc.), very high score
             $currencyKeywords = ['gold', 'gp', 'coins', 'coin', 'credits', 'money', 'currency', 'gil', 'zeny', 'mesos'];
@@ -114,11 +129,11 @@ class SimilarListingsService
 
         // Regular scoring for items/accounts/services
         // Title similarity (0-0.5 points)
-        $titleSimilarity = $this->stringSimilarity($product1->title, $product2->title);
+        $titleSimilarity = $this->stringSimilarity($title1, $title2);
         $score += $titleSimilarity * 0.5;
 
         // Exact normalized title match (bonus 0.3 points)
-        if ($this->normalizeTitle($product1->title) === $this->normalizeTitle($product2->title)) {
+        if ($this->normalizeTitle($title1) === $this->normalizeTitle($title2)) {
             $score += 0.3;
         }
 
@@ -252,20 +267,27 @@ class SimilarListingsService
                 continue;
             }
 
-            $normalizedTitle = $this->normalizeTitle($product->title);
+            $productTitle = $product->title ?? $product->name ?? '';
+            if (empty($productTitle)) {
+                continue;
+            }
+
+            $normalizedTitle = $this->normalizeTitle($productTitle);
 
             // Find exact matches in the current result set
             $matches = $products->filter(function ($p) use ($product, $normalizedTitle, $processed) {
+                $pTitle = $p->title ?? $p->name ?? '';
                 return !in_array($p->id, $processed)
                     && $p->game_id === $product->game_id
-                    && $this->normalizeTitle($p->title) === $normalizedTitle;
+                    && !empty($pTitle)
+                    && $this->normalizeTitle($pTitle) === $normalizedTitle;
             });
 
             if ($matches->count() > 1) {
                 // Multiple sellers for same item
                 $grouped[] = [
                     'type' => 'group',
-                    'title' => $product->title,
+                    'title' => $productTitle,
                     'game_id' => $product->game_id,
                     'product_type' => $type,
                     'listings' => $matches->sortBy('price')->values()->all(),

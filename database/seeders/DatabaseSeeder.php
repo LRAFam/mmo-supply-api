@@ -238,6 +238,13 @@ class DatabaseSeeder extends Seeder
             'is_active' => true,
         ]);
 
+        $roblox = Game::firstOrCreate(['slug' => 'roblox'], [
+            'title' => 'Roblox',
+            'description' => 'The ultimate virtual universe. Trade Robux, limiteds, game passes, and premium accounts.',
+            'logo' => null,
+            'is_active' => true,
+        ]);
+
         // Create Currencies
         Currency::create([
             'user_id' => $seller1->id,

@@ -363,6 +363,270 @@ class OrderController extends Controller
         }
     }
 
+    /**
+     * Create multi-seller orders with sequential payment processing
+     * Supports payment breakdown (multiple payment methods for different sellers)
+     */
+    public function createMultiSellerOrders(Request $request): JsonResponse
+    {
+        $request->validate([
+            'payment_breakdown' => 'required|array|min:1',
+            'payment_breakdown.*.method' => 'required|string|in:stripe,paypal',
+            'payment_breakdown.*.seller_ids' => 'required|array|min:1',
+            'payment_breakdown.*.seller_ids.*' => 'required|integer|exists:users,id',
+            'payment_breakdown.*.total' => 'required|numeric|min:0.01',
+            'seller_notes' => 'nullable|array',
+            'seller_notes.*' => 'nullable|string|max:1000',
+        ]);
+
+        try {
+            DB::beginTransaction();
+
+            $user = $request->user();
+
+            // SECURITY: Require email verification before purchases
+            if (!$user->email_verified_at) {
+                return response()->json([
+                    'error' => 'Email verification required',
+                    'message' => 'Please verify your email address before making purchases',
+                    'requires_verification' => true
+                ], 403);
+            }
+
+            // Get cart
+            $cart = Cart::where('user_id', $user->id)->first();
+
+            if (!$cart || empty($cart->items)) {
+                return response()->json(['error' => 'Cart is empty'], 400);
+            }
+
+            $cartItems = $cart->items;
+            $orderGroupId = 'OG-' . strtoupper(uniqid());
+            $allOrders = [];
+            $paymentIntents = [];
+
+            // Process each payment method separately
+            foreach ($request->payment_breakdown as $breakdown) {
+                $paymentMethod = $breakdown['method'];
+                $sellerIds = $breakdown['seller_ids'];
+                $sellerNotes = $request->seller_notes ?? [];
+
+                // Group cart items by seller for this payment method
+                $sellerGroups = [];
+                foreach ($cartItems as $cartItem) {
+                    $productType = $cartItem['product_type'];
+                    $productId = $cartItem['product_id'];
+                    $quantity = $cartItem['quantity'];
+
+                    // Get the product to find seller_id
+                    $productTypeEnum = ProductType::tryFromString($productType);
+                    if (!$productTypeEnum) {
+                        continue;
+                    }
+                    $modelClass = $productTypeEnum->getModelClass();
+                    $product = $modelClass::with('game')->find($productId);
+
+                    if (!$product) {
+                        continue;
+                    }
+
+                    $sellerId = $product->user_id;
+
+                    // Only include items for sellers in this payment breakdown
+                    if (!in_array($sellerId, $sellerIds)) {
+                        continue;
+                    }
+
+                    if (!isset($sellerGroups[$sellerId])) {
+                        $sellerGroups[$sellerId] = [
+                            'seller_id' => $sellerId,
+                            'items' => [],
+                            'subtotal' => 0,
+                        ];
+                    }
+
+                    // Use stored unit_price from cart
+                    $unitPrice = isset($cartItem['unit_price']) ? floatval($cartItem['unit_price']) : 0;
+
+                    // Fallback: calculate price if not stored
+                    if ($unitPrice === 0) {
+                        $priceField = $productTypeEnum->getPriceField();
+                        $price = floatval($product->{$priceField} ?? 0);
+                        $discount = floatval($product->discount ?? 0);
+                        $unitPrice = $price - $discount;
+
+                        // For OSRS currency
+                        if ($productType === 'currency' && isset($product->price_per_million) && $product->price_per_million > 0 && isset($cartItem['metadata']['gold_amount'])) {
+                            $goldInMillions = floatval($cartItem['metadata']['gold_amount']) / 1000000;
+                            $unitPrice = floatval($product->price_per_million) * $goldInMillions;
+                        }
+                        // For package-based services
+                        elseif ($productType === 'service' && isset($cartItem['metadata']['package_price'])) {
+                            $unitPrice = floatval($cartItem['metadata']['package_price']);
+                        }
+                    }
+
+                    $itemTotal = $quantity * $unitPrice;
+                    $sellerGroups[$sellerId]['subtotal'] += $itemTotal;
+
+                    $sellerGroups[$sellerId]['items'][] = [
+                        'product_type' => $productTypeEnum->value,
+                        'product_id' => $product->id,
+                        'product_name' => $product->name ?? $product->title ?? 'Unknown',
+                        'product_description' => $product->description ?? '',
+                        'product_images' => $product->images ?? [],
+                        'game_name' => $product->game ? $product->game->title : null,
+                        'quantity' => $quantity,
+                        'price' => $unitPrice,
+                        'total' => $itemTotal,
+                        'metadata' => $cartItem['metadata'] ?? null,
+                    ];
+
+                    // Decrease stock if applicable
+                    if (isset($product->stock)) {
+                        $product->decrement('stock', $quantity);
+                    }
+                }
+
+                // Create an order for each seller in this payment breakdown
+                foreach ($sellerGroups as $sellerId => $group) {
+                    $subtotal = $group['subtotal'];
+                    $tax = $subtotal * 0.0; // 0% tax
+                    $total = $subtotal + $tax;
+
+                    // Calculate platform fee (10% default)
+                    $platformFeePercentage = 10.00;
+                    $platformFee = $total * ($platformFeePercentage / 100);
+                    $sellerPayout = $total - $platformFee;
+
+                    // Create order for this seller
+                    $order = Order::create([
+                        'user_id' => $user->id,
+                        'seller_id' => $sellerId,
+                        'order_group_id' => $orderGroupId,
+                        'cart_id' => $cart->id,
+                        'status' => 'pending',
+                        'subtotal' => $subtotal,
+                        'tax' => $tax,
+                        'total' => $total,
+                        'platform_fee' => $platformFee,
+                        'seller_payout' => $sellerPayout,
+                        'payment_method' => $paymentMethod,
+                        'payment_status' => 'pending',
+                        'buyer_notes' => $sellerNotes[$sellerId] ?? null,
+                    ]);
+
+                    // Create order items
+                    $notificationService = app(NotificationService::class);
+                    foreach ($group['items'] as $item) {
+                        $orderItem = OrderItem::create(array_merge(
+                            ['order_id' => $order->id, 'seller_id' => $sellerId, 'status' => 'pending'],
+                            $item
+                        ));
+
+                        // Notify seller of new order
+                        $notificationService->newOrderForSeller(
+                            sellerId: $sellerId,
+                            orderId: $order->id,
+                            productTitle: $item['product_name'],
+                            amount: $item['total']
+                        );
+                    }
+
+                    // Send order message to seller
+                    $frontendUrl = config('app.frontend_url');
+                    $sellerOrderUrl = "{$frontendUrl}/seller/orders/{$order->id}";
+
+                    $orderDetails = "📦 **New Order #{$order->order_number}**\n\n";
+                    foreach ($group['items'] as $item) {
+                        $productTypePlural = $item['product_type'] . 's';
+                        $productUrl = "{$frontendUrl}/{$productTypePlural}/{$item['product_id']}";
+                        $orderDetails .= "**Product:** [{$item['product_name']}]({$productUrl})\n";
+                        $orderDetails .= "**Quantity:** {$item['quantity']}\n";
+                        $orderDetails .= "**Total:** $" . number_format($item['total'], 2) . "\n\n";
+                    }
+
+                    if (isset($sellerNotes[$sellerId])) {
+                        $orderDetails .= "**Buyer Notes:**\n{$sellerNotes[$sellerId]}\n\n";
+                    }
+
+                    $orderDetails .= "➡️ [View Order Details]({$sellerOrderUrl})\n\n";
+                    $orderDetails .= "Please review the order details and start processing this order.";
+
+                    MessageController::sendOrderSystemMessage(
+                        $user->id,
+                        $sellerId,
+                        $order->id,
+                        $orderDetails,
+                        'order_created'
+                    );
+
+                    $allOrders[] = $order;
+                }
+
+                // Create payment intent for this payment method
+                if ($paymentMethod === 'stripe') {
+                    $stripeService = new StripePaymentService();
+
+                    // Get all orders for this payment method
+                    $methodOrders = collect($allOrders)->filter(function ($order) use ($paymentMethod) {
+                        return $order->payment_method === $paymentMethod;
+                    });
+
+                    // Create a single PaymentIntent for all orders with this payment method
+                    try {
+                        $totalAmount = $methodOrders->sum('total');
+                        $paymentIntent = $stripeService->createMultiSellerPaymentIntent(
+                            $user,
+                            $methodOrders->toArray(),
+                            $totalAmount
+                        );
+
+                        // Update all orders with the payment intent ID
+                        foreach ($methodOrders as $order) {
+                            $order->update([
+                                'stripe_payment_intent_id' => $paymentIntent->id
+                            ]);
+                        }
+
+                        $paymentIntents[$paymentMethod] = [
+                            'client_secret' => $paymentIntent->client_secret,
+                            'payment_intent_id' => $paymentIntent->id,
+                            'amount' => $totalAmount,
+                        ];
+                    } catch (\Exception $e) {
+                        DB::rollBack();
+                        return response()->json([
+                            'error' => 'Failed to create Stripe payment: ' . $e->getMessage(),
+                            'hint' => 'One or more sellers may need to complete Stripe account setup'
+                        ], 400);
+                    }
+                } elseif ($paymentMethod === 'paypal') {
+                    // PayPal Commerce Platform implementation
+                    DB::rollBack();
+                    return response()->json([
+                        'error' => 'PayPal payments are being implemented. Please use Stripe payment for now.',
+                        'available_methods' => ['stripe'],
+                    ], 400);
+                }
+            }
+
+            DB::commit();
+
+            return response()->json([
+                'message' => 'Orders created successfully',
+                'order_group_id' => $orderGroupId,
+                'orders' => $allOrders,
+                'payment_intents' => $paymentIntents,
+                'requires_payment' => !empty($paymentIntents),
+            ], 201);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json(['error' => 'Failed to create orders: ' . $e->getMessage()], 500);
+        }
+    }
+
     public function deliverItem(Request $request, $orderId, $itemId): JsonResponse
     {
         $request->validate([

@@ -106,7 +106,7 @@ class CartController extends Controller
             }
 
             $modelClass = $productTypeEnum->getModelClass();
-            $product = $modelClass::with('game')->find($productId);
+            $product = $modelClass::with(['game', 'user'])->find($productId);
 
             if (!$product) {
                 return null;
@@ -146,6 +146,20 @@ class CartController extends Controller
                 'discount' => $discount,
                 'discount_price' => $discountPrice,
                 'images' => $product->images ?? [],
+                'user_id' => $product->user_id ?? null,
+                'user' => $product->user ? [
+                    'id' => $product->user->id,
+                    'name' => $product->user->name,
+                    'username' => $product->user->username,
+                    'discord_username' => $product->user->discord_username,
+                    'discord_avatar' => $product->user->discord_avatar,
+                    'discord_banner' => $product->user->discord_banner,
+                    'discord_id' => $product->user->discord_id,
+                    'custom_avatar' => $product->user->custom_avatar,
+                    'custom_banner' => $product->user->custom_banner,
+                    'avatar' => $product->user->avatar,
+                    'banner' => $product->user->banner,
+                ] : null,
                 'game' => $product->game ? [
                     'id' => $product->game->id,
                     'title' => $product->game->title,

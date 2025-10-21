@@ -58,12 +58,26 @@ class User extends Authenticatable implements FilamentUser
         'badge_inventory',
         'active_profile_theme',
         'active_title',
+        'discord_id',
+        'discord_username',
+        'discord_avatar',
+        'discord_banner',
+        'discord_accent_color',
+        'custom_avatar',
+        'custom_banner',
         'discord_verification_code',
         'discord_verification_code_expires_at',
         'discord_guild_id',
         'discord_channel_id',
         'discord_registered_at',
         'discord_notifications_enabled',
+        'stripe_connect_id',
+        'stripe_connect_enabled',
+        'stripe_connect_data',
+        'paypal_merchant_id',
+        'paypal_enabled',
+        'paypal_data',
+        'payment_methods',
     ];
 
     /**
@@ -89,6 +103,11 @@ class User extends Authenticatable implements FilamentUser
             'is_seller' => 'boolean',
             'owned_cosmetics' => 'array',
             'badge_inventory' => 'array',
+            'stripe_connect_enabled' => 'boolean',
+            'stripe_connect_data' => 'array',
+            'paypal_enabled' => 'boolean',
+            'paypal_data' => 'array',
+            'payment_methods' => 'array',
         ];
     }
 
@@ -477,6 +496,62 @@ class User extends Authenticatable implements FilamentUser
     public function isModerator(): bool
     {
         return $this->role === 'moderator';
+    }
+
+    /**
+     * Get accepted payment methods for this seller
+     *
+     * @return array
+     */
+    public function getAcceptedPaymentMethods(): array
+    {
+        $methods = [];
+
+        if ($this->stripe_connect_enabled && $this->stripe_connect_id) {
+            $methods[] = [
+                'provider' => 'stripe',
+                'label' => 'Credit/Debit Card',
+                'icon' => 'credit-card',
+                'description' => 'Pay securely with Stripe'
+            ];
+        }
+
+        if ($this->paypal_enabled && $this->paypal_merchant_id) {
+            $methods[] = [
+                'provider' => 'paypal',
+                'label' => 'PayPal',
+                'icon' => 'paypal',
+                'description' => 'Pay with PayPal balance or card'
+            ];
+        }
+
+        return $methods;
+    }
+
+    /**
+     * Check if seller accepts a specific payment method
+     *
+     * @param string $method
+     * @return bool
+     */
+    public function acceptsPaymentMethod(string $method): bool
+    {
+        return match($method) {
+            'stripe' => $this->stripe_connect_enabled && $this->stripe_connect_id,
+            'paypal' => $this->paypal_enabled && $this->paypal_merchant_id,
+            default => false,
+        };
+    }
+
+    /**
+     * Check if seller has at least one payment method configured
+     *
+     * @return bool
+     */
+    public function hasAnyPaymentMethod(): bool
+    {
+        return $this->acceptsPaymentMethod('stripe') ||
+               $this->acceptsPaymentMethod('paypal');
     }
 
     /**
@@ -914,5 +989,120 @@ class User extends Authenticatable implements FilamentUser
     public function enableDiscordNotifications(): void
     {
         $this->update(['discord_notifications_enabled' => true]);
+    }
+
+    // ============================================================
+    // Profile Image Methods (Discord + S3)
+    // ============================================================
+
+    /**
+     * Get the user's avatar URL (prioritizes custom S3 upload over Discord)
+     */
+    public function getAvatarUrl(): ?string
+    {
+        // Priority 1: Custom S3 uploaded avatar
+        if ($this->custom_avatar) {
+            return $this->custom_avatar;
+        }
+
+        // Priority 2: Discord avatar from CDN
+        if ($this->discord_avatar) {
+            // Check if it's already a full URL
+            if (str_starts_with($this->discord_avatar, 'http://') || str_starts_with($this->discord_avatar, 'https://')) {
+                return $this->discord_avatar;
+            }
+
+            // Otherwise, it's a hash - construct the URL
+            if ($this->discord_id) {
+                $extension = str_starts_with($this->discord_avatar, 'a_') ? 'gif' : 'png';
+                return "https://cdn.discordapp.com/avatars/{$this->discord_id}/{$this->discord_avatar}.{$extension}?size=256";
+            }
+        }
+
+        // Priority 3: Legacy avatar field (if exists)
+        if ($this->avatar) {
+            return $this->avatar;
+        }
+
+        // Fallback: Default avatar
+        return null;
+    }
+
+    /**
+     * Get the user's banner URL (prioritizes custom S3 upload over Discord)
+     */
+    public function getBannerUrl(): ?string
+    {
+        // Priority 1: Custom S3 uploaded banner
+        if ($this->custom_banner) {
+            return $this->custom_banner;
+        }
+
+        // Priority 2: Discord banner from CDN
+        if ($this->discord_banner) {
+            // Check if it's already a full URL
+            if (str_starts_with($this->discord_banner, 'http://') || str_starts_with($this->discord_banner, 'https://')) {
+                return $this->discord_banner;
+            }
+
+            // Otherwise, it's a hash - construct the URL
+            if ($this->discord_id) {
+                $extension = str_starts_with($this->discord_banner, 'a_') ? 'gif' : 'png';
+                return "https://cdn.discordapp.com/banners/{$this->discord_id}/{$this->discord_banner}.{$extension}?size=600";
+            }
+        }
+
+        // Priority 3: Legacy banner field (if exists)
+        if ($this->banner) {
+            return $this->banner;
+        }
+
+        // Fallback: No banner
+        return null;
+    }
+
+    /**
+     * Get Discord accent color (for profile theming)
+     */
+    public function getAccentColor(): ?string
+    {
+        if ($this->discord_accent_color) {
+            // Discord returns accent color as an integer, convert to hex
+            return '#' . str_pad(dechex((int)$this->discord_accent_color), 6, '0', STR_PAD_LEFT);
+        }
+
+        return null;
+    }
+
+    /**
+     * Set custom avatar (S3 URL)
+     */
+    public function setCustomAvatar(string $s3Url): void
+    {
+        $this->update(['custom_avatar' => $s3Url]);
+    }
+
+    /**
+     * Set custom banner (S3 URL)
+     */
+    public function setCustomBanner(string $s3Url): void
+    {
+        $this->update(['custom_banner' => $s3Url]);
+    }
+
+    /**
+     * Remove custom avatar (revert to Discord avatar)
+     */
+    public function removeCustomAvatar(): void
+    {
+        $this->update(['custom_avatar' => null]);
+    }
+
+    /**
+     * Remove custom banner (revert to Discord banner)
+     */
+    public function removeCustomBanner(): void
+    {
+        $this->update(['custom_banner' => null]);
     }
 }

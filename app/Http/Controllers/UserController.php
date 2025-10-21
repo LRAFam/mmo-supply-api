@@ -36,6 +36,23 @@ class UserController extends Controller
                 'subscription_tier' => $user->getSubscriptionTier(),
                 'provider_tier' => $user->auto_tier ?? 'standard',
                 'provider_earnings_percentage' => $user->getSellerEarningsPercentage(),
+
+                // Discord OAuth fields
+                'discord_id' => $user->discord_id,
+                'discord_username' => $user->discord_username,
+                'discord_avatar' => $user->discord_avatar,
+                'discord_banner' => $user->discord_banner,
+                'discord_accent_color' => $user->discord_accent_color,
+
+                // Custom S3 uploads
+                'custom_avatar' => $user->custom_avatar,
+                'custom_banner' => $user->custom_banner,
+
+                // Computed URLs (prioritized)
+                'avatar_url' => $user->getAvatarUrl(),
+                'banner_url' => $user->getBannerUrl(),
+                'accent_color' => $user->getAccentColor(),
+
                 'wallet' => [
                     'balance' => $user->wallet->balance ?? 0,
                 ],
@@ -143,7 +160,7 @@ class UserController extends Controller
 
         // Get recent reviews
         $recentReviews = $user->receivedReviews()
-            ->with(['user:id,name,avatar'])
+            ->with(['user:id,name,avatar,discord_id,discord_avatar,custom_avatar'])
             ->orderBy('created_at', 'desc')
             ->limit(10)
             ->get()
@@ -157,6 +174,7 @@ class UserController extends Controller
                         'id' => $review->user->id,
                         'name' => $review->user->name,
                         'avatar' => $review->user->avatar,
+                        'avatar_url' => $review->user->getAvatarUrl(),
                     ],
                 ];
             });
@@ -286,11 +304,29 @@ class UserController extends Controller
             'is_seller' => (bool) $user->is_seller,
             'subscription_tier' => $user->getSubscriptionTier(),
             'created_at' => $user->created_at,
+
+            // Discord OAuth fields
+            'discord_id' => $user->discord_id,
+            'discord_username' => $user->discord_username,
+            'discord_avatar' => $user->discord_avatar,
+            'discord_banner' => $user->discord_banner,
+            'discord_accent_color' => $user->discord_accent_color,
+
+            // Custom S3 uploads
+            'custom_avatar' => $user->custom_avatar,
+            'custom_banner' => $user->custom_banner,
+
+            // Computed URLs (prioritized)
+            'avatar_url' => $user->getAvatarUrl(),
+            'banner_url' => $user->getBannerUrl(),
+            'accent_color' => $user->getAccentColor(),
+
             // Cosmetics
             'owned_cosmetics' => $user->owned_cosmetics ?? [],
             'badge_inventory' => $user->badge_inventory ?? [],
             'active_profile_theme' => $user->active_profile_theme,
             'active_title' => $user->active_title,
+
             // Stats
             'achievement_points' => $user->achievement_points ?? 0,
             'total_achievements' => $achievements->count(),
@@ -536,6 +572,26 @@ class UserController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Successfully removed as provider for this game',
+        ]);
+    }
+
+    /**
+     * Get a seller's accepted payment methods
+     */
+    public function getPaymentMethods(Request $request, $userId): JsonResponse
+    {
+        $seller = User::findOrFail($userId);
+
+        if (!$seller->is_seller) {
+            return response()->json([
+                'error' => 'User is not a seller'
+            ], 400);
+        }
+
+        return response()->json([
+            'success' => true,
+            'payment_methods' => $seller->getAcceptedPaymentMethods(),
+            'has_payment_methods' => $seller->hasAnyPaymentMethod(),
         ]);
     }
 }
