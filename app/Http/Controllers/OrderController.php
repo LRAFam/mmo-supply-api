@@ -111,7 +111,7 @@ class OrderController extends Controller
     public function store(Request $request): JsonResponse
     {
         $request->validate([
-            'payment_method' => 'required|string|in:wallet,stripe,paypal',
+            'payment_method' => 'required|string|in:wallet,stripe,paypal', // Sellers choose which methods they accept
             'buyer_notes' => 'nullable|string|max:1000',
         ]);
 
@@ -340,6 +340,14 @@ class OrderController extends Controller
                         'hint' => 'Seller may need to complete Stripe account setup'
                     ], 400);
                 }
+            } elseif ($request->payment_method === 'paypal') {
+                // PayPal Commerce Platform implementation coming soon
+                // For now, guide users to use alternative payment methods
+                DB::rollBack();
+                return response()->json([
+                    'error' => 'PayPal payments are being implemented. Please use Stripe or Wallet payment for now.',
+                    'available_methods' => ['wallet', 'stripe'],
+                ], 400);
             }
 
             DB::commit();
