@@ -13,8 +13,9 @@ return new class extends Migration
     {
         Schema::table('orders', function (Blueprint $table) {
             // Add seller_id - each order belongs to ONE seller (if not exists)
+            // Made nullable to support existing orders in production
             if (!Schema::hasColumn('orders', 'seller_id')) {
-                $table->foreignId('seller_id')->after('user_id')->constrained('users')->onDelete('cascade');
+                $table->foreignId('seller_id')->after('user_id')->nullable()->constrained('users')->onDelete('cascade');
             }
 
             // Add order_group_id - links orders from same checkout
