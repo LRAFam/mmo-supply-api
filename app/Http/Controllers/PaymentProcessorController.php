@@ -211,7 +211,7 @@ class PaymentProcessorController extends Controller
             $params = [
                 'client_id' => $clientId,
                 'response_type' => 'code',
-                'scope' => 'openid profile email',
+                'scope' => 'openid email https://uri.paypal.com/services/paypalattributes',
                 'redirect_uri' => config('app.frontend_url') . '/settings/payment-processors/paypal/callback',
                 'state' => $state,
             ];
