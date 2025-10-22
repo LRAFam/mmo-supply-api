@@ -44,26 +44,39 @@ use Illuminate\Support\Facades\Broadcast;
 // Broadcasting authentication for token-based auth
 Route::middleware('auth:sanctum')->post('/broadcasting/auth', function (Request $request) {
     $user = $request->user();
-    $channelName = $request->input('channel_name');
 
-    error_log("Broadcasting auth attempt - User: " . ($user?->id ?? 'null') . ", Channel: " . $channelName);
+    // Log comprehensive debug info
+    \Log::info('[Broadcasting Auth] Request received', [
+        'user_id' => $user?->id,
+        'channel_name' => $request->input('channel_name'),
+        'socket_id' => $request->input('socket_id'),
+        'has_auth_header' => $request->hasHeader('Authorization'),
+        'auth_header' => $request->hasHeader('Authorization') ? substr($request->header('Authorization'), 0, 30) . '...' : 'MISSING',
+    ]);
+
+    if (!$user) {
+        \Log::error('[Broadcasting Auth] No authenticated user found');
+        return response()->json([
+            'message' => 'Unauthenticated',
+            'error' => 'No user found in request after auth:sanctum middleware'
+        ], 401);
+    }
 
     try {
         $response = Broadcast::auth($request);
-
-        error_log("Broadcasting auth SUCCESS - User: " . ($user?->id ?? 'null') . ", Channel: " . $channelName);
-
+        \Log::info('[Broadcasting Auth] Success', ['user_id' => $user->id]);
         return $response;
     } catch (\Exception $e) {
-        error_log("Broadcasting auth EXCEPTION - User: " . ($user?->id ?? 'null') . ", Channel: " . $channelName . ", Error: " . $e->getMessage());
+        \Log::error('[Broadcasting Auth] Exception', [
+            'user_id' => $user->id,
+            'channel' => $request->input('channel_name'),
+            'error' => $e->getMessage(),
+            'trace' => $e->getTraceAsString()
+        ]);
 
         return response()->json([
             'message' => 'Channel authorization failed',
-            'debug' => [
-                'user_id' => $user?->id,
-                'channel' => $channelName,
-                'error' => $e->getMessage(),
-            ]
+            'error' => $e->getMessage(),
         ], 403);
     }
 });
