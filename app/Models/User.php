@@ -78,6 +78,7 @@ class User extends Authenticatable implements FilamentUser
         'paypal_enabled',
         'paypal_data',
         'payment_methods',
+        'seller_welcome_bonus_claimed_at',
     ];
 
     /**
@@ -108,6 +109,7 @@ class User extends Authenticatable implements FilamentUser
             'paypal_enabled' => 'boolean',
             'paypal_data' => 'array',
             'payment_methods' => 'array',
+            'seller_welcome_bonus_claimed_at' => 'datetime',
         ];
     }
 

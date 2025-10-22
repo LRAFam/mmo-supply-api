@@ -135,4 +135,19 @@ class Wallet extends Model
     {
         return $this->balance + $this->bonus_balance;
     }
+
+    public function addBonusBalance(float $amount, string $description = null, array $metadata = []): Transaction
+    {
+        $this->increment('bonus_balance', $amount);
+
+        return $this->transactions()->create([
+            'user_id' => $this->user_id,
+            'type' => 'bonus',
+            'amount' => $amount,
+            'currency' => $this->currency,
+            'status' => 'completed',
+            'description' => $description ?? 'Bonus balance added',
+            'metadata' => $metadata,
+        ]);
+    }
 }

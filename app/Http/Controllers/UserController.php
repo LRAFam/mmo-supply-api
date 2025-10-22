@@ -406,6 +406,24 @@ class UserController extends Controller
                 'is_seller' => true,
                 'seller_tier' => 'standard',
             ]);
+
+            // Grant welcome bonus ONLY if they've never received it before
+            // This prevents abuse by re-onboarding
+            if (!$user->seller_welcome_bonus_claimed_at) {
+                $wallet = $user->wallet;
+                if ($wallet) {
+                    $wallet->addBonusBalance(
+                        10.00,
+                        'Welcome bonus - Use for advertising your listings',
+                        ['reason' => 'new_seller_welcome_bonus']
+                    );
+
+                    // Mark bonus as claimed with timestamp
+                    $user->update([
+                        'seller_welcome_bonus_claimed_at' => now(),
+                    ]);
+                }
+            }
         }
 
         // Sync provider records for selected games
