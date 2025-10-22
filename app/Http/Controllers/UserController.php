@@ -391,12 +391,7 @@ class UserController extends Controller
     {
         $user = $request->user();
 
-        // Check if user is already a seller
-        if ($user->is_seller) {
-            return response()->json([
-                'error' => 'You are already a seller'
-            ], 400);
-        }
+        $isReOnboarding = $user->is_seller;
 
         // Validate requirements including game selection
         $validated = $request->validate([
@@ -405,13 +400,16 @@ class UserController extends Controller
             'game_ids.*' => 'exists:games,id',
         ]);
 
-        // Update user to seller status
-        $user->update([
-            'is_seller' => true,
-            'seller_tier' => 'standard',
-        ]);
+        // Update user to seller status if not already
+        if (!$user->is_seller) {
+            $user->update([
+                'is_seller' => true,
+                'seller_tier' => 'standard',
+            ]);
+        }
 
-        // Create provider records for each selected game
+        // Sync provider records for selected games
+        // This will add new games and keep existing ones
         foreach ($validated['game_ids'] as $gameId) {
             \App\Models\Provider::firstOrCreate(
                 [
@@ -426,15 +424,20 @@ class UserController extends Controller
         }
 
         // Log the action
-        \Log::info('User became seller', [
+        \Log::info($isReOnboarding ? 'Seller updated settings' : 'User became seller', [
             'user_id' => $user->id,
             'user_name' => $user->name,
             'games' => $validated['game_ids'],
+            're_onboarding' => $isReOnboarding,
         ]);
+
+        $message = $isReOnboarding
+            ? 'Your seller settings have been updated successfully!'
+            : 'Congratulations! You are now a seller. Start creating your first listing.';
 
         return response()->json([
             'success' => true,
-            'message' => 'Congratulations! You are now a seller. Start creating your first listing.',
+            'message' => $message,
             'user' => [
                 'id' => $user->id,
                 'name' => $user->name,
