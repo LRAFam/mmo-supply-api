@@ -19,13 +19,30 @@ class AuthController extends Controller
     /**
      * Redirect the user to the Discord provider for authentication.
      */
-    public function redirectToProvider(): RedirectResponse
+    public function redirectToProvider(Request $request): RedirectResponse
     {
         try {
-            return Socialite::driver('discord')
-                ->redirectUrl(config('services.discord.redirect'))
-                ->stateless()
-                ->redirect();
+            $driver = Socialite::driver('discord')
+                ->redirectUrl(config('services.discord.redirect'));
+
+            // If user is authenticated and wants to link Discord, pass user_id in state
+            if ($request->bearerToken()) {
+                try {
+                    $user = Auth::guard('sanctum')->user();
+                    if ($user) {
+                        // Encode user ID in state parameter
+                        $state = encrypt(['user_id' => $user->id, 'timestamp' => time()]);
+                        $driver->with(['state' => $state]);
+                    }
+                } catch (\Exception $e) {
+                    // If token is invalid, continue as normal login/registration
+                    Log::info('Discord auth: Invalid token, proceeding as new login', [
+                        'error' => $e->getMessage()
+                    ]);
+                }
+            }
+
+            return $driver->stateless()->redirect();
         } catch (\Exception $e) {
             Log::error('Discord authentication error: ' . $e->getMessage(), [
                 'exception' => $e,
@@ -43,6 +60,65 @@ class AuthController extends Controller
         try {
             $discordUser = Socialite::driver('discord')->stateless()->user();
 
+            // Check if this is a linking scenario via state parameter
+            $authenticatedUser = null;
+            if ($request->has('state')) {
+                try {
+                    $stateData = decrypt($request->state);
+                    if (isset($stateData['user_id'])) {
+                        $authenticatedUser = User::find($stateData['user_id']);
+                    }
+                } catch (\Exception $e) {
+                    Log::warning('Discord callback: Invalid state parameter', [
+                        'error' => $e->getMessage()
+                    ]);
+                }
+            }
+
+            if ($authenticatedUser) {
+                // User is logged in and wants to link Discord to their account
+
+                // Check if Discord is already linked to another account
+                $existingDiscordUser = User::where('discord_id', $discordUser->id)
+                    ->where('id', '!=', $authenticatedUser->id)
+                    ->first();
+
+                if ($existingDiscordUser) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'This Discord account is already linked to another user.',
+                    ], 400);
+                }
+
+                // Link Discord to current authenticated user
+                $authenticatedUser->update([
+                    'discord_id' => $discordUser->id,
+                    'discord_username' => $discordUser->nickname ?? $discordUser->name,
+                    'discord_avatar' => $discordUser->avatar,
+                    'discord_banner' => $discordUser->user['banner'] ?? null,
+                    'discord_accent_color' => $discordUser->user['accent_color'] ?? null,
+                ]);
+
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Discord account linked successfully!',
+                    'user' => [
+                        'id' => $authenticatedUser->id,
+                        'name' => $authenticatedUser->name,
+                        'email' => $authenticatedUser->email,
+                        'discord_id' => $authenticatedUser->discord_id,
+                        'discord_username' => $authenticatedUser->discord_username,
+                        'discord_avatar' => $authenticatedUser->discord_avatar,
+                        'discord_banner' => $authenticatedUser->discord_banner,
+                        'discord_accent_color' => $authenticatedUser->discord_accent_color,
+                        'avatar_url' => $authenticatedUser->getAvatarUrl(),
+                        'banner_url' => $authenticatedUser->getBannerUrl(),
+                        'accent_color' => $authenticatedUser->getAccentColor(),
+                    ],
+                ], 200);
+            }
+
+            // No authenticated user - this is a login/registration flow
             // Find or create user by discord_id
             $user = User::where('discord_id', $discordUser->id)->first();
 
