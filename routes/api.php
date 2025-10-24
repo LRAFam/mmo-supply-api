@@ -37,6 +37,7 @@ use App\Http\Controllers\CryptoPaymentController;
 use App\Http\Controllers\PayPalPayoutController;
 use App\Http\Controllers\PayPalCheckoutController;
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\PaymentMethodController;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Broadcast;
@@ -181,6 +182,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/subscriptions/current', [SubscriptionController::class, 'current']);
     Route::post('/subscriptions/setup-intent', [SubscriptionController::class, 'setupIntent']);
     Route::post('/subscriptions/subscribe', [SubscriptionController::class, 'subscribe']);
+    Route::post('/subscriptions/subscribe-with-wallet', [SubscriptionController::class, 'subscribeWithWallet']); // NEW: Wallet subscription
     Route::get('/subscriptions/invoices', [SubscriptionController::class, 'invoices']);
     Route::post('/subscriptions/cancel', [SubscriptionController::class, 'cancel']);
     Route::post('/subscriptions/resume', [SubscriptionController::class, 'resume']);
@@ -289,6 +291,21 @@ Route::middleware(['auth:sanctum'])->prefix('payment-processors')->name('payment
     Route::post('/paypal/connect', [\App\Http\Controllers\PaymentProcessorController::class, 'paypalConnect'])->middleware('throttle:10,1')->name('paypal.connect');
     Route::post('/paypal/callback', [\App\Http\Controllers\PaymentProcessorController::class, 'paypalCallback'])->name('paypal.callback')->withoutMiddleware(['auth:sanctum']);
     Route::delete('/paypal/disconnect', [\App\Http\Controllers\PaymentProcessorController::class, 'paypalDisconnect'])->middleware('throttle:10,1')->name('paypal.disconnect');
+});
+
+// Payment Method Management
+Route::middleware(['auth:sanctum'])->group(function () {
+    // Public payment method routes (for checkout)
+    Route::get('/payment-methods', [PaymentMethodController::class, 'index']);
+    Route::post('/payment-methods/calculate-fees', [PaymentMethodController::class, 'calculateFees']);
+
+    // Admin-only payment method management
+    Route::middleware(['admin'])->prefix('admin')->group(function () {
+        Route::get('/payment-methods', [PaymentMethodController::class, 'all']);
+        Route::post('/payment-methods/{method}/toggle', [PaymentMethodController::class, 'toggle']);
+        Route::patch('/payment-methods/{method}', [PaymentMethodController::class, 'update']);
+        Route::post('/payment-methods/{method}/ban', [PaymentMethodController::class, 'ban']);
+    });
 });
 
 // Seasons (Public endpoints)

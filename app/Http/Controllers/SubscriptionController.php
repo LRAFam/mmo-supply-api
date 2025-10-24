@@ -490,4 +490,107 @@ class SubscriptionController extends Controller
             return response()->json(['error' => 'Failed to cancel subscription'], 500);
         }
     }
+
+    /**
+     * Subscribe using wallet balance (alternative to Stripe)
+     */
+    public function subscribeWithWallet(Request $request): JsonResponse
+    {
+        $request->validate([
+            'tier' => 'required|in:premium,elite',
+            'price' => 'required|numeric|min:0',
+        ]);
+
+        $user = $request->user();
+        $tier = $request->tier;
+        $price = floatval($request->price);
+
+        // Verify price matches tier
+        $expectedPrice = $tier === 'elite' ? 29.99 : 9.99;
+        if (abs($price - $expectedPrice) > 0.01) {
+            return response()->json([
+                'error' => 'Invalid price for selected tier'
+            ], 400);
+        }
+
+        // Check if user already has an active subscription
+        $existingSubscription = $user->subscriptions()->where('stripe_status', 'active')->first();
+        if ($existingSubscription) {
+            return response()->json([
+                'error' => 'You already have an active subscription. Please cancel it first to change plans.'
+            ], 400);
+        }
+
+        // Check wallet balance
+        $walletBalance = floatval($user->wallet_balance ?? 0);
+        if ($walletBalance < $price) {
+            return response()->json([
+                'error' => 'Insufficient wallet balance',
+                'required' => $price,
+                'available' => $walletBalance,
+            ], 400);
+        }
+
+        try {
+            \DB::beginTransaction();
+
+            // Deduct from wallet balance
+            $newBalance = $walletBalance - $price;
+            $user->update(['wallet_balance' => $newBalance]);
+
+            // Create wallet subscription record
+            $subscription = \App\Models\WalletSubscription::create([
+                'user_id' => $user->id,
+                'tier' => $tier,
+                'price' => $price,
+                'status' => 'active',
+                'payment_method' => 'wallet',
+                'starts_at' => now(),
+                'expires_at' => now()->addMonth(),
+                'auto_renew' => true,
+            ]);
+
+            // Log transaction
+            \App\Models\Transaction::create([
+                'user_id' => $user->id,
+                'type' => 'subscription_payment',
+                'amount' => -$price,
+                'balance_after' => $newBalance,
+                'description' => ucfirst($tier) . ' subscription payment',
+                'metadata' => [
+                    'subscription_id' => $subscription->id,
+                    'tier' => $tier,
+                    'payment_method' => 'wallet',
+                ],
+            ]);
+
+            \DB::commit();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Subscription activated successfully!',
+                'subscription' => [
+                    'id' => $subscription->id,
+                    'tier' => $subscription->tier,
+                    'price' => $subscription->price,
+                    'status' => $subscription->status,
+                    'starts_at' => $subscription->starts_at,
+                    'expires_at' => $subscription->expires_at,
+                    'auto_renew' => $subscription->auto_renew,
+                ],
+                'new_balance' => $newBalance,
+            ], 201);
+
+        } catch (\Exception $e) {
+            \DB::rollBack();
+            \Log::error('Wallet subscription failed', [
+                'user_id' => $user->id,
+                'error' => $e->getMessage(),
+            ]);
+
+            return response()->json([
+                'error' => 'Failed to process wallet subscription: ' . $e->getMessage()
+            ], 500);
+        }
+    }
 }

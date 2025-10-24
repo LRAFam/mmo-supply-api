@@ -393,19 +393,40 @@ class UserController extends Controller
 
         $isReOnboarding = $user->is_seller;
 
-        // Validate requirements including game selection
+        // Validate requirements including game selection and payment methods
         $validated = $request->validate([
             'agree_to_terms' => 'required|boolean|accepted',
             'game_ids' => 'required|array|min:1',
             'game_ids.*' => 'exists:games,id',
+            'payment_methods' => 'nullable|array',
+            'payment_methods.stripe' => 'nullable|boolean',
+            'payment_methods.paypal' => 'nullable|boolean',
+            'payment_methods.crypto' => 'nullable|boolean',
+            'crypto_address' => 'nullable|string|max:255',
+            'crypto_currency' => 'nullable|string|in:btc,eth,usdt,usdc,ltc,bnb,trx,xrp',
         ]);
 
-        // Update user to seller status if not already
+        // Prepare update data
+        $updateData = [];
+
+        // Update seller status if not already
         if (!$user->is_seller) {
-            $user->update([
-                'is_seller' => true,
-                'seller_tier' => 'standard',
-            ]);
+            $updateData['is_seller'] = true;
+            $updateData['seller_tier'] = 'standard';
+        }
+
+        // Update crypto payment info if provided
+        if (isset($validated['payment_methods']['crypto']) && $validated['payment_methods']['crypto']) {
+            if (!empty($validated['crypto_address'])) {
+                $updateData['crypto_address'] = $validated['crypto_address'];
+                $updateData['crypto_currency'] = $validated['crypto_currency'] ?? 'btc';
+                $updateData['crypto_enabled'] = true;
+            }
+        }
+
+        // Apply updates if any
+        if (!empty($updateData)) {
+            $user->update($updateData);
 
             // Grant welcome bonus ONLY if they've never received it before
             // This prevents abuse by re-onboarding

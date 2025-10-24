@@ -79,6 +79,9 @@ class User extends Authenticatable implements FilamentUser
         'paypal_data',
         'payment_methods',
         'seller_welcome_bonus_claimed_at',
+        'crypto_address',
+        'crypto_currency',
+        'crypto_enabled',
     ];
 
     /**
@@ -110,6 +113,7 @@ class User extends Authenticatable implements FilamentUser
             'paypal_data' => 'array',
             'payment_methods' => 'array',
             'seller_welcome_bonus_claimed_at' => 'datetime',
+            'crypto_enabled' => 'boolean',
         ];
     }
 
@@ -527,6 +531,15 @@ class User extends Authenticatable implements FilamentUser
             ];
         }
 
+        if ($this->crypto_enabled && $this->crypto_address) {
+            $methods[] = [
+                'provider' => 'crypto',
+                'label' => 'Cryptocurrency',
+                'icon' => 'bitcoin',
+                'description' => 'Pay with crypto directly to seller'
+            ];
+        }
+
         return $methods;
     }
 
@@ -541,6 +554,7 @@ class User extends Authenticatable implements FilamentUser
         return match($method) {
             'stripe' => $this->stripe_connect_enabled && $this->stripe_connect_id,
             'paypal' => $this->paypal_enabled && $this->paypal_merchant_id,
+            'crypto' => $this->crypto_enabled && $this->crypto_address,
             default => false,
         };
     }
@@ -553,7 +567,8 @@ class User extends Authenticatable implements FilamentUser
     public function hasAnyPaymentMethod(): bool
     {
         return $this->acceptsPaymentMethod('stripe') ||
-               $this->acceptsPaymentMethod('paypal');
+               $this->acceptsPaymentMethod('paypal') ||
+               $this->acceptsPaymentMethod('crypto');
     }
 
     /**
